@@ -169,3 +169,7 @@ func (*FakeManager) AppProtectPluginStart(appDone chan error) {
 func (*FakeManager) AppProtectPluginQuit() {
 	glog.V(3).Infof("Quitting FakeAppProtectPlugin")
 }
+
+func (*FakeManager) AllowReload() {
+	glog.V(3).Infof("Allowing Reload")
+}

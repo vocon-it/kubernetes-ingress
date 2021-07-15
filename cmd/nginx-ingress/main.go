@@ -654,6 +654,7 @@ func main() {
 		IsPrometheusEnabled:          *enablePrometheusMetrics,
 		IsLatencyMetricsEnabled:      *enableLatencyMetrics,
 		IsTLSPassthroughEnabled:      *enableTLSPassthrough,
+		Manager:                      nginxManager,
 	}
 
 	lbc := k8s.NewLoadBalancerController(lbcInput)

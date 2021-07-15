@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/nginxinc/kubernetes-ingress/internal/k8s/appprotect"
+	"github.com/nginxinc/kubernetes-ingress/internal/nginx"
 	"k8s.io/client-go/informers"
 
 	"github.com/golang/glog"
@@ -149,6 +150,7 @@ type LoadBalancerController struct {
 	configuration                 *Configuration
 	secretStore                   secrets.SecretStore
 	appProtectConfiguration       appprotect.Configuration
+	manager                       nginx.Manager
 }
 
 var keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
@@ -186,6 +188,7 @@ type NewLoadBalancerControllerInput struct {
 	IsPrometheusEnabled          bool
 	IsLatencyMetricsEnabled      bool
 	IsTLSPassthroughEnabled      bool
+	Manager                      nginx.Manager
 }
 
 // NewLoadBalancerController creates a controller
@@ -215,6 +218,7 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		internalRoutesEnabled:        input.InternalRoutesEnabled,
 		isPrometheusEnabled:          input.IsPrometheusEnabled,
 		isLatencyMetricsEnabled:      input.IsLatencyMetricsEnabled,
+		manager:                      input.Manager,
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -723,6 +727,12 @@ func (lbc *LoadBalancerController) sync(task task) {
 	}
 
 	if !lbc.isNginxReady && lbc.syncQueue.Len() == 0 {
+		lbc.manager.AllowReload()
+		err := lbc.manager.Reload(nginx.ReloadForOtherUpdate)
+		if err != nil {
+			glog.Errorf("error reloading NGINX after processing initial queue elements: %v", err)
+		}
+
 		lbc.isNginxReady = true
 		glog.V(3).Infof("NGINX is ready")
 	}

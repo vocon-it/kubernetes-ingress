@@ -67,6 +67,7 @@ type Manager interface {
 	Start(done chan error)
 	Version() string
 	Reload(isEndpointsUpdate bool) error
+	AllowReload()
 	Quit()
 	UpdateConfigVersionFile(openTracing bool)
 	SetPlusClients(plusClient *client.NginxClient, plusConfigVersionCheckClient *http.Client)
@@ -99,6 +100,7 @@ type LocalManager struct {
 	OpenTracing                  bool
 	appProtectPluginPid          int
 	appProtectAgentPid           int
+	reload                       bool
 }
 
 // NewLocalManager creates a LocalManager.
@@ -121,6 +123,7 @@ func NewLocalManager(confPath string, debug bool, mc collectors.ManagerCollector
 		configVersion:               0,
 		verifyClient:                newVerifyClient(timeout),
 		metricsCollector:            mc,
+		reload:                      false,
 	}
 
 	return &manager
@@ -285,6 +288,10 @@ func (lm *LocalManager) Start(done chan error) {
 
 // Reload reloads NGINX.
 func (lm *LocalManager) Reload(isEndpointsUpdate bool) error {
+	if !lm.reload {
+		return nil
+	}
+
 	// write a new config version
 	lm.configVersion++
 	lm.UpdateConfigVersionFile(lm.OpenTracing)
@@ -353,6 +360,8 @@ func (lm *LocalManager) SetPlusClients(plusClient *client.NginxClient, plusConfi
 
 // UpdateServersInPlus updates NGINX Plus servers of the given upstream.
 func (lm *LocalManager) UpdateServersInPlus(upstream string, servers []string, config ServerConfig) error {
+	// skip until reloading is allowed
+
 	err := verifyConfigVersion(lm.plusConfigVersionCheckClient, lm.configVersion)
 	if err != nil {
 		return fmt.Errorf("error verifying config version: %w", err)
@@ -384,6 +393,8 @@ func (lm *LocalManager) UpdateServersInPlus(upstream string, servers []string, c
 
 // UpdateStreamServersInPlus updates NGINX Plus stream servers of the given upstream.
 func (lm *LocalManager) UpdateStreamServersInPlus(upstream string, servers []string) error {
+	// skip until reloading is allowed
+
 	err := verifyConfigVersion(lm.plusConfigVersionCheckClient, lm.configVersion)
 	if err != nil {
 		return fmt.Errorf("error verifying config version: %w", err)
@@ -510,6 +521,10 @@ func (lm *LocalManager) AppProtectPluginQuit() {
 	if err := shellOut(killcmd); err != nil {
 		glog.Fatalf("Failed to quit AppProtect Plugin: %v", err)
 	}
+}
+
+func (lm *LocalManager) AllowReload() {
+	lm.reload = true
 }
 
 func getBinaryFileName(debug bool) string {
