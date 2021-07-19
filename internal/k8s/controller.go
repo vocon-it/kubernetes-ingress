@@ -151,6 +151,7 @@ type LoadBalancerController struct {
 	secretStore                   secrets.SecretStore
 	appProtectConfiguration       appprotect.Configuration
 	manager                       nginx.Manager
+	skipInitialReloads            bool
 }
 
 var keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
@@ -189,6 +190,7 @@ type NewLoadBalancerControllerInput struct {
 	IsLatencyMetricsEnabled      bool
 	IsTLSPassthroughEnabled      bool
 	Manager                      nginx.Manager
+	SkipInitialReloads           bool
 }
 
 // NewLoadBalancerController creates a controller
@@ -219,6 +221,7 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		isPrometheusEnabled:          input.IsPrometheusEnabled,
 		isLatencyMetricsEnabled:      input.IsLatencyMetricsEnabled,
 		manager:                      input.Manager,
+		skipInitialReloads:           input.SkipInitialReloads,
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -727,10 +730,16 @@ func (lbc *LoadBalancerController) sync(task task) {
 	}
 
 	if !lbc.isNginxReady && lbc.syncQueue.Len() == 0 {
-		lbc.manager.AllowReload()
-		err := lbc.manager.Reload(nginx.ReloadForOtherUpdate)
-		if err != nil {
-			glog.Errorf("error reloading NGINX after processing initial queue elements: %v", err)
+		if lbc.skipInitialReloads {
+			lbc.manager.AllowReload()
+			// TO-DO
+			// because it is a first reload with all the configuration generated,
+			// we need to update status and report events for all handled resources,
+			// so that in case of a reload failure, it will be reported!
+			err := lbc.manager.Reload(nginx.ReloadForOtherUpdate)
+			if err != nil {
+				glog.Errorf("error reloading NGINX after processing initial queue elements: %v", err)
+			}
 		}
 
 		lbc.isNginxReady = true

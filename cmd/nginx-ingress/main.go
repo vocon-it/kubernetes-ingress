@@ -188,6 +188,9 @@ var (
 	enableLatencyMetrics = flag.Bool("enable-latency-metrics", false,
 		"Enable collection of latency metrics for upstreams. Requires -enable-prometheus-metrics")
 
+	skipInitialReloads = flag.Bool("skip-initial-reloads", true,
+		"Skip reloading NGINX when the Ingress Controller generates initial NGINX configuration before the IC pod becomes ready")
+
 	startupCheckFn func() error
 )
 
@@ -405,7 +408,7 @@ func main() {
 		nginxManager = nginx.NewFakeManager("/etc/nginx")
 	} else {
 		timeout := time.Duration(*nginxReloadTimeout) * time.Millisecond
-		nginxManager = nginx.NewLocalManager("/etc/nginx/", *nginxDebug, managerCollector, timeout)
+		nginxManager = nginx.NewLocalManager("/etc/nginx/", *nginxDebug, managerCollector, timeout, !*skipInitialReloads)
 	}
 	nginxVersion := nginxManager.Version()
 	isPlus := strings.Contains(nginxVersion, "plus")
@@ -655,6 +658,7 @@ func main() {
 		IsLatencyMetricsEnabled:      *enableLatencyMetrics,
 		IsTLSPassthroughEnabled:      *enableTLSPassthrough,
 		Manager:                      nginxManager,
+		SkipInitialReloads:           *skipInitialReloads,
 	}
 
 	lbc := k8s.NewLoadBalancerController(lbcInput)

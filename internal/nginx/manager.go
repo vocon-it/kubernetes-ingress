@@ -104,7 +104,7 @@ type LocalManager struct {
 }
 
 // NewLocalManager creates a LocalManager.
-func NewLocalManager(confPath string, debug bool, mc collectors.ManagerCollector, timeout time.Duration) *LocalManager {
+func NewLocalManager(confPath string, debug bool, mc collectors.ManagerCollector, timeout time.Duration, reload bool) *LocalManager {
 	verifyConfigGenerator, err := newVerifyConfigGenerator()
 	if err != nil {
 		glog.Fatalf("error instantiating a verifyConfigGenerator: %v", err)
@@ -123,7 +123,7 @@ func NewLocalManager(confPath string, debug bool, mc collectors.ManagerCollector
 		configVersion:               0,
 		verifyClient:                newVerifyClient(timeout),
 		metricsCollector:            mc,
-		reload:                      false,
+		reload:                      reload,
 	}
 
 	return &manager
