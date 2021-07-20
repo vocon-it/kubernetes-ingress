@@ -1,5 +1,6 @@
 package api
 
+// Apis provides access to the Kubernetes resources api.
 type Apis struct {
 	Ingresses               *Ingresses
 	Endpoints               *Endpoints

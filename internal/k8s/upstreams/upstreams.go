@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// Upstreams is an additional layer on top of the kubernetes resource apis. It provides methods that involve
+// more than one type of Resource they don't belong to a specific resource api.
 type Upstreams struct {
 	pods      *api.Pods
 	services  *api.Services

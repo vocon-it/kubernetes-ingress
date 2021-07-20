@@ -223,10 +223,7 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		)
 	}
 
-	err := addHandlers(lbc, &input)
-	if err != nil {
-		glog.Fatalf("failed to add handlers to Controller: %v", err)
-	}
+	addHandlers(lbc, &input)
 
 	lbc.statusUpdater = &statusUpdater{
 		client:              input.KubeClient,

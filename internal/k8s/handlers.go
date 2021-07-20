@@ -21,7 +21,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func addHandlers(lbc *LoadBalancerController, input *NewLoadBalancerControllerInput) error {
+func addHandlers(lbc *LoadBalancerController, input *NewLoadBalancerControllerInput) {
 	addSecretHandler(lbc)
 	addIngressHandler(lbc)
 	addServiceHandler(lbc)
@@ -62,8 +62,6 @@ func addHandlers(lbc *LoadBalancerController, input *NewLoadBalancerControllerIn
 	if input.IsLeaderElectionEnabled {
 		addLeaderHandler(lbc)
 	}
-
-	return nil
 }
 
 func addLeaderHandler(lbc *LoadBalancerController) {
