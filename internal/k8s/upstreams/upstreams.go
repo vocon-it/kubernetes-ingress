@@ -49,7 +49,7 @@ func (u *Upstreams) GetHealthChecksForIngressBackend(backend *networking.Ingress
 	return findProbeForPods(ps, svcPort)
 }
 
-func (u *Upstreams) GetPodOwnerTypeAndNameFromAddress(ns, name string) (parentType, parentName string) {
+func (u *Upstreams) getPodOwnerTypeAndNameFromAddress(ns, name string) (parentType, parentName string) {
 	pod, exists, err := u.pods.GetByKey(fmt.Sprintf("%s/%s", ns, name))
 	if err != nil {
 		glog.Warningf("could not get pod by key %s/%s: %v", ns, name, err)
@@ -111,7 +111,7 @@ func (u *Upstreams) GetServiceForIngressBackend(backend *networking.IngressBacke
 	return svc, nil
 }
 
-func (u *Upstreams) GetEndpointsForServiceWithSubselector(targetPort int32, subselector map[string]string, svc *api_v1.Service) (endps []PodEndpoint, err error) {
+func (u *Upstreams) getEndpointsForServiceWithSubselector(targetPort int32, subselector map[string]string, svc *api_v1.Service) (endps []PodEndpoint, err error) {
 	ps, err := u.pods.ListByNamespace(svc.Namespace, labels.Merge(svc.Spec.Selector, subselector).AsSelector())
 	if err != nil {
 		return nil, fmt.Errorf("Error getting pods in namespace %v that match the selector %v: %w", svc.Namespace, labels.Merge(svc.Spec.Selector, subselector), err)
@@ -149,7 +149,7 @@ func (u *Upstreams) GetEndpointsForSubselector(namespace string, upstream conf_v
 		return nil, fmt.Errorf("No port %v in service %s", upstream.Port, svc.Name)
 	}
 
-	endps, err = u.GetEndpointsForServiceWithSubselector(targetPort, upstream.Subselector, svc)
+	endps, err = u.getEndpointsForServiceWithSubselector(targetPort, upstream.Subselector, svc)
 	if err != nil {
 		return nil, fmt.Errorf("Error retrieving endpoints for the service %v: %w", upstream.Service, err)
 	}
@@ -226,7 +226,7 @@ func (u *Upstreams) getEndpointsForPort(endps api_v1.Endpoints, ingSvcPort intst
 						Address: addr,
 					}
 					if address.TargetRef != nil {
-						parentType, parentName := u.GetPodOwnerTypeAndNameFromAddress(address.TargetRef.Namespace, address.TargetRef.Name)
+						parentType, parentName := u.getPodOwnerTypeAndNameFromAddress(address.TargetRef.Namespace, address.TargetRef.Name)
 						podEnd.OwnerType = parentType
 						podEnd.OwnerName = parentName
 						podEnd.PodName = address.TargetRef.Name
