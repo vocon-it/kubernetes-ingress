@@ -21,28 +21,28 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func addHandlers(lbc *LoadBalancerController, input *NewLoadBalancerControllerInput) {
-	addSecretHandler(lbc)
-	addIngressHandler(lbc)
-	addServiceHandler(lbc)
-	addEndpointHandler(lbc)
-	addPodHandler(lbc)
+func addHandlers(lbc *LoadBalancerController, input *NewLoadBalancerControllerInput, a *api.Apis) {
+	addSecretHandler(lbc, a)
+	addIngressHandler(lbc, a)
+	addServiceHandler(lbc, input, a)
+	addEndpointHandler(lbc, a)
+	addPodHandler(lbc, a)
 
 	if lbc.appProtectEnabled {
-		addAppProtectPolicyHandler(lbc)
-		addAppProtectLogConfHandler(lbc)
-		addAppProtectUserSigHandler(lbc)
+		addAppProtectPolicyHandler(lbc, a)
+		addAppProtectLogConfHandler(lbc, a)
+		addAppProtectUserSigHandler(lbc, a)
 	}
 
 	if lbc.areCustomResourcesEnabled {
-		addVirtualServerHandler(lbc)
-		addVirtualServerRouteHandler(lbc)
-		addTransportServerHandler(lbc)
-		addPolicyHandler(lbc)
+		addVirtualServerHandler(lbc, a)
+		addVirtualServerRouteHandler(lbc, a)
+		addTransportServerHandler(lbc, a)
+		addPolicyHandler(lbc, a)
 
 		if input.GlobalConfiguration != "" {
 			namespace, name, _ := ParseNamespaceName(input.GlobalConfiguration)
-			addGlobalConfigurationHandler(lbc, namespace, name)
+			addGlobalConfigurationHandler(lbc, namespace, name, a)
 		}
 	}
 
@@ -51,12 +51,12 @@ func addHandlers(lbc *LoadBalancerController, input *NewLoadBalancerControllerIn
 		if err != nil {
 			glog.Warning(err)
 		} else {
-			addConfigMapHandler(lbc, namespace, name)
+			addConfigMapHandler(lbc, namespace, name, a)
 		}
 	}
 
 	if input.IngressLink != "" {
-		addIngressLinkHandler(lbc, input.IngressLink)
+		addIngressLinkHandler(lbc, input.IngressLink, a)
 	}
 
 	if input.IsLeaderElectionEnabled {
@@ -74,68 +74,65 @@ func addLeaderHandler(lbc *LoadBalancerController) {
 }
 
 // addappProtectPolicyHandler creates dynamic informers for custom appprotect policy resource
-func addAppProtectPolicyHandler(lbc *LoadBalancerController) {
+func addAppProtectPolicyHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createAppProtectPolicyHandlers(lbc.syncQueue)
 	informer := lbc.dynInformerFactory.ForResource(appprotect.PolicyGVR).Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.AppProtectPolicies = api.NewAppProtectPolicies(informer.GetStore())
+	a.AppProtectPolicies = api.NewAppProtectPolicies(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
 // addappProtectLogConfHandler creates dynamic informer for custom appprotect logging config resource
-func addAppProtectLogConfHandler(lbc *LoadBalancerController) {
+func addAppProtectLogConfHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createAppProtectLogConfHandlers(lbc.syncQueue)
 	informer := lbc.dynInformerFactory.ForResource(appprotect.LogConfGVR).Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.AppProtectLogConfs = api.NewAppProtectLogConfs(informer.GetStore())
+	a.AppProtectLogConfs = api.NewAppProtectLogConfs(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
 // addappProtectUserSigHandler creates dynamic informer for custom appprotect user defined signature resource
-func addAppProtectUserSigHandler(lbc *LoadBalancerController) {
+func addAppProtectUserSigHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createAppProtectUserSigHandlers(lbc.syncQueue)
 	informer := lbc.dynInformerFactory.ForResource(appprotect.UserSigGVR).Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.AppProtectUserSigLister = api.NewAppProtectUserSigs(informer.GetStore())
+	a.AppProtectUserSigLister = api.NewAppProtectUserSigs(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addSecretHandler(lbc *LoadBalancerController) {
+func addSecretHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handler := createSecretHandlers(lbc.syncQueue)
 	informer := lbc.sharedInformerFactory.Core().V1().Secrets().Informer()
 	informer.AddEventHandler(handler)
-	lbc.api.Secrets = api.NewSecrets(informer.GetStore())
+	a.Secrets = api.NewSecrets(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addServiceHandler(lbc *LoadBalancerController) {
-	handlers := createServiceHandlers(lbc.syncQueue, lbc.statusUpdater)
+func addServiceHandler(lbc *LoadBalancerController, input *NewLoadBalancerControllerInput, a *api.Apis) {
+	handlers := createServiceHandlers(lbc.syncQueue, input)
 	informer := lbc.sharedInformerFactory.Core().V1().Services().Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.Services = api.NewServices(informer.GetStore())
-
+	a.Services = api.NewServices(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addIngressHandler(lbc *LoadBalancerController) {
+func addIngressHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createIngressHandlers(lbc.syncQueue)
 	informer := lbc.sharedInformerFactory.Networking().V1beta1().Ingresses().Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.Ingresses = api.NewIngresses(informer.GetStore())
-
+	a.Ingresses = api.NewIngresses(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addEndpointHandler(lbc *LoadBalancerController) {
+func addEndpointHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createEndpointHandlers(lbc.syncQueue)
 	informer := lbc.sharedInformerFactory.Core().V1().Endpoints().Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.Endpoints = api.NewEndpoints(informer.GetStore())
-
+	a.Endpoints = api.NewEndpoints(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addConfigMapHandler(lbc *LoadBalancerController, namespace string, name string) {
+func addConfigMapHandler(lbc *LoadBalancerController, namespace string, name string, a *api.Apis) {
 	handlers := createConfigMapHandlers(lbc.syncQueue, name)
 	store, controller := cache.NewInformer(
 		cache.NewListWatchFromClient(
@@ -148,44 +145,41 @@ func addConfigMapHandler(lbc *LoadBalancerController, namespace string, name str
 		handlers,
 	)
 	lbc.configMapController = controller
-	lbc.api.ConfigMaps = api.NewConfigMaps(store)
+	a.ConfigMaps = api.NewConfigMaps(store)
 	lbc.cacheSyncs = append(lbc.cacheSyncs, lbc.configMapController.HasSynced)
 }
 
-func addPodHandler(lbc *LoadBalancerController) {
+func addPodHandler(lbc *LoadBalancerController, a *api.Apis) {
 	informer := lbc.sharedInformerFactory.Core().V1().Pods().Informer()
-	lbc.api.Pods = api.NewPods(informer.GetIndexer())
+	a.Pods = api.NewPods(informer.GetIndexer())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addVirtualServerHandler(lbc *LoadBalancerController) {
+func addVirtualServerHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createVirtualServerHandlers(lbc.syncQueue)
 	informer := lbc.confSharedInformerFactory.K8s().V1().VirtualServers().Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.VirtualServers = api.NewVirtualServers(informer.GetStore())
-
+	a.VirtualServers = api.NewVirtualServers(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addVirtualServerRouteHandler(lbc *LoadBalancerController) {
+func addVirtualServerRouteHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createVirtualServerRouteHandlers(lbc.syncQueue)
 	informer := lbc.confSharedInformerFactory.K8s().V1().VirtualServerRoutes().Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.VirtualServerRoutes = api.NewVirtualServerRoutes(informer.GetStore())
-
+	a.VirtualServerRoutes = api.NewVirtualServerRoutes(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addPolicyHandler(lbc *LoadBalancerController) {
+func addPolicyHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createPolicyHandlers(lbc.syncQueue)
 	informer := lbc.confSharedInformerFactory.K8s().V1().Policies().Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.Policies = api.NewPolicies(informer.GetStore())
-
+	a.Policies = api.NewPolicies(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addGlobalConfigurationHandler(lbc *LoadBalancerController, namespace string, name string) {
+func addGlobalConfigurationHandler(lbc *LoadBalancerController, namespace string, name string, a *api.Apis) {
 	handlers := createGlobalConfigurationHandlers(lbc.syncQueue)
 	store, controller := cache.NewInformer(
 		cache.NewListWatchFromClient(
@@ -198,19 +192,19 @@ func addGlobalConfigurationHandler(lbc *LoadBalancerController, namespace string
 		handlers,
 	)
 	lbc.globalConfigurationController = controller
-	lbc.api.GlobalConfigurations = api.NewGlobalConfigurations(store)
+	a.GlobalConfigurations = api.NewGlobalConfigurations(store)
 	lbc.cacheSyncs = append(lbc.cacheSyncs, lbc.globalConfigurationController.HasSynced)
 }
 
-func addTransportServerHandler(lbc *LoadBalancerController) {
+func addTransportServerHandler(lbc *LoadBalancerController, a *api.Apis) {
 	handlers := createTransportServerHandlers(lbc.syncQueue)
 	informer := lbc.confSharedInformerFactory.K8s().V1alpha1().TransportServers().Informer()
 	informer.AddEventHandler(handlers)
-	lbc.api.TransportServers = api.NewTransportServers(informer.GetStore())
+	a.TransportServers = api.NewTransportServers(informer.GetStore())
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
 
-func addIngressLinkHandler(lbc *LoadBalancerController, name string) {
+func addIngressLinkHandler(lbc *LoadBalancerController, name string, a *api.Apis) {
 	handlers := createIngressLinkHandlers(lbc.syncQueue)
 	optionsModifier := func(options *meta_v1.ListOptions) {
 		options.FieldSelector = fields.Set{"metadata.name": name}.String()
@@ -222,7 +216,7 @@ func addIngressLinkHandler(lbc *LoadBalancerController, name string) {
 	informer.Informer().AddEventHandlerWithResyncPeriod(handlers, lbc.resync)
 
 	lbc.ingressLinkInformer = informer.Informer()
-	lbc.api.IngressLinks = api.NewIngressLinks(informer.Informer().GetStore())
+	a.IngressLinks = api.NewIngressLinks(informer.Informer().GetStore())
 
 	lbc.cacheSyncs = append(lbc.cacheSyncs, lbc.ingressLinkInformer.HasSynced)
 }
@@ -397,7 +391,7 @@ func createSecretHandlers(q Queue) cache.ResourceEventHandlerFuncs {
 // or a change of the externalName field of an ExternalName service.
 //
 // In both cases we enqueue the service to be processed by syncService
-func createServiceHandlers(q Queue, su *statusUpdater) cache.ResourceEventHandlerFuncs {
+func createServiceHandlers(q Queue, input *NewLoadBalancerControllerInput) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			svc := obj.(*v1.Service)
@@ -426,7 +420,7 @@ func createServiceHandlers(q Queue, su *statusUpdater) cache.ResourceEventHandle
 		UpdateFunc: func(old, cur interface{}) {
 			if !reflect.DeepEqual(old, cur) {
 				curSvc := cur.(*v1.Service)
-				if su.IsExternalServiceForStatus(curSvc) {
+				if input.ControllerNamespace == curSvc.Namespace && input.ExternalServiceName == curSvc.Name {
 					q.Enqueue(curSvc)
 					return
 				}

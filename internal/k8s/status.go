@@ -43,10 +43,6 @@ type statusUpdater struct {
 	confClient               k8s_nginx.Interface
 }
 
-func (su *statusUpdater) IsExternalServiceForStatus(svc *api_v1.Service) bool {
-	return su.namespace == svc.Namespace && su.externalServiceName == svc.Name
-}
-
 func (su *statusUpdater) UpdateExternalEndpointsForResources(resource []Resource) error {
 	failed := false
 

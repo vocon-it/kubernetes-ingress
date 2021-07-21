@@ -188,7 +188,6 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		internalRoutesEnabled:        input.InternalRoutesEnabled,
 		isPrometheusEnabled:          input.IsPrometheusEnabled,
 		isLatencyMetricsEnabled:      input.IsLatencyMetricsEnabled,
-		api:                          api.NewApis(),
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -222,17 +221,19 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		)
 	}
 
-	addHandlers(lbc, &input)
-	lbc.upstreams = upstreams.NewUpstreams(lbc.api)
-
 	lbc.statusUpdater = &statusUpdater{
 		client:              input.KubeClient,
 		namespace:           input.ControllerNamespace,
 		externalServiceName: input.ExternalServiceName,
 		keyFunc:             keyFunc,
 		confClient:          input.ConfClient,
-		api:                 lbc.api,
 	}
+
+	a := api.NewApis()
+	addHandlers(lbc, &input, a)
+	lbc.upstreams = upstreams.NewUpstreams(a)
+	lbc.api = a
+	lbc.statusUpdater.api = a
 
 	lbc.configuration = NewConfiguration(
 		lbc.HasCorrectIngressClass,
@@ -1435,11 +1436,6 @@ func (lbc *LoadBalancerController) syncService(task task) {
 
 	warnings, updateErr := lbc.configurator.AddOrUpdateResources(resourceExes)
 	lbc.updateResourcesStatusAndEvents(resources, warnings, updateErr)
-}
-
-// IsExternalServiceForStatus matches the service specified by the external-service cli arg
-func (lbc *LoadBalancerController) IsExternalServiceForStatus(svc *api_v1.Service) bool {
-	return lbc.statusUpdater.IsExternalServiceForStatus(svc)
 }
 
 // IsExternalServiceKeyForStatus matches the service key specified by the external-service cli arg
