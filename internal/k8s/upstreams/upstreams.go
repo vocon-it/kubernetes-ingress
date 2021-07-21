@@ -213,7 +213,7 @@ func (u *Upstreams) getEndpointsForPort(endps api_v1.Endpoints, ingSvcPort intst
 	}
 
 	if targetPort == 0 {
-		return nil, fmt.Errorf("No port %v in service %s", ingSvcPort, svc.Name)
+		return nil, fmt.Errorf("No port %v in service %s. Available service ports: %v", ingSvcPort, svc.Name, svc.Spec.Ports)
 	}
 
 	for _, subset := range endps.Subsets {

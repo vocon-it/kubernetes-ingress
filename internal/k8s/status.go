@@ -643,7 +643,7 @@ func (su *statusUpdater) UpdatePolicyStatus(pol *v1.Policy, state string, reason
 		return nil
 	}
 
-	polCopy := polLatest.DeepCopy()
+	polCopy := polLatest
 	polCopy.Status.State = state
 	polCopy.Status.Reason = reason
 	polCopy.Status.Message = message

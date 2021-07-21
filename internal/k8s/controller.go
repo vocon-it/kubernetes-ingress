@@ -190,7 +190,6 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		isLatencyMetricsEnabled:      input.IsLatencyMetricsEnabled,
 		api:                          api.NewApis(),
 	}
-	lbc.upstreams = upstreams.NewUpstreams(lbc.api)
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -224,6 +223,7 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 	}
 
 	addHandlers(lbc, &input)
+	lbc.upstreams = upstreams.NewUpstreams(lbc.api)
 
 	lbc.statusUpdater = &statusUpdater{
 		client:              input.KubeClient,
