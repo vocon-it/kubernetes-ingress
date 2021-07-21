@@ -152,6 +152,7 @@ type LoadBalancerController struct {
 	appProtectConfiguration       appprotect.Configuration
 	manager                       nginx.Manager
 	skipInitialReloads            bool
+	configMapsKey                 string
 }
 
 var keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
@@ -222,6 +223,7 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		isLatencyMetricsEnabled:      input.IsLatencyMetricsEnabled,
 		manager:                      input.Manager,
 		skipInitialReloads:           input.SkipInitialReloads,
+		configMapsKey:                input.ConfigMaps,
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -689,45 +691,49 @@ func (lbc *LoadBalancerController) preSyncSecrets() {
 	}
 }
 
-func (lbc *LoadBalancerController) sync(task task) {
-	glog.V(3).Infof("Syncing %v", task.Key)
+func (lbc *LoadBalancerController) sync(t task) {
+	t1 := time.Now()
+
+	glog.V(3).Infof("Syncing %v", t.Key)
 	if lbc.spiffeController != nil {
 		lbc.syncLock.Lock()
 		defer lbc.syncLock.Unlock()
 	}
-	switch task.Kind {
+	switch t.Kind {
 	case ingress:
-		lbc.syncIngress(task)
+		lbc.syncIngress(t)
 		lbc.updateIngressMetrics()
 	case configMap:
-		lbc.syncConfigMap(task)
+		lbc.syncConfigMap(t)
 	case endpoints:
-		lbc.syncEndpoints(task)
+		lbc.syncEndpoints(t)
 	case secret:
-		lbc.syncSecret(task)
+		lbc.syncSecret(t)
 	case service:
-		lbc.syncService(task)
+		lbc.syncService(t)
 	case virtualserver:
-		lbc.syncVirtualServer(task)
+		lbc.syncVirtualServer(t)
 		lbc.updateVirtualServerMetrics()
 	case virtualServerRoute:
-		lbc.syncVirtualServerRoute(task)
+		lbc.syncVirtualServerRoute(t)
 		lbc.updateVirtualServerMetrics()
 	case globalConfiguration:
-		lbc.syncGlobalConfiguration(task)
+		lbc.syncGlobalConfiguration(t)
 	case transportserver:
-		lbc.syncTransportServer(task)
+		lbc.syncTransportServer(t)
 	case policy:
-		lbc.syncPolicy(task)
+		lbc.syncPolicy(t)
 	case appProtectPolicy:
-		lbc.syncAppProtectPolicy(task)
+		lbc.syncAppProtectPolicy(t)
 	case appProtectLogConf:
-		lbc.syncAppProtectLogConf(task)
+		lbc.syncAppProtectLogConf(t)
 	case appProtectUserSig:
-		lbc.syncAppProtectUserSig(task)
+		lbc.syncAppProtectUserSig(t)
 	case ingressLink:
-		lbc.syncIngressLink(task)
+		lbc.syncIngressLink(t)
 	}
+
+	glog.V(3).Infof("syncing %s took: %v", t.Key, time.Since(t1))
 
 	if !lbc.isNginxReady && lbc.syncQueue.Len() == 0 {
 		if lbc.skipInitialReloads {
@@ -736,10 +742,12 @@ func (lbc *LoadBalancerController) sync(task task) {
 			// because it is a first reload with all the configuration generated,
 			// we need to update status and report events for all handled resources,
 			// so that in case of a reload failure, it will be reported!
-			err := lbc.manager.Reload(nginx.ReloadForOtherUpdate)
-			if err != nil {
-				glog.Errorf("error reloading NGINX after processing initial queue elements: %v", err)
-			}
+
+			// syncing ConfigMap regenerates all L7 configuration
+			t = task{Kind: configMap, Key: lbc.configMapsKey}
+			t1 = time.Now()
+			lbc.syncConfigMap(t)
+			glog.V(3).Infof("special syncing %s took: %v", t.Key, time.Since(t1))
 		}
 
 		lbc.isNginxReady = true
