@@ -20,6 +20,9 @@
 
 [context.branch-deploy]
   command = "hugo --gc -b $DEPLOY_PRIME_URL/nginx-ingress-controller"
+  
+[context.docs-1.12]
+  command = "hugo --gc -e production"  
 
 [[headers]]
   for = "/*"
