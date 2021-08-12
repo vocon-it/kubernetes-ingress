@@ -17,6 +17,7 @@ from suite.resources_utils import (
     delete_secret,
     create_secret_from_yaml,
 )
+
 from suite.yaml_utils import get_first_ingress_host_from_yaml
 from settings import TEST_DATA
 
@@ -109,6 +110,7 @@ class TestPrometheusExporter:
         ],
         indirect=["ingress_controller"],
     )
+    @pytest.mark.test
     def test_metrics(
         self,
         ingress_controller_endpoint,

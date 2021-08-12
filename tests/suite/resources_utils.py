@@ -7,8 +7,14 @@ import json
 import pytest
 import requests
 
+from suite.ingressV1_res import (
+    create_ingress_v1,
+    delete_ingress_v1,
+    replace_ingress_v1,
+)
 from kubernetes.client import CoreV1Api, ExtensionsV1beta1Api, RbacAuthorizationV1Api, V1Service, AppsV1Api
 from kubernetes.client.rest import ApiException
+from kubernetes.client.api_client import ApiClient
 from kubernetes.stream import stream
 from kubernetes import client
 from more_itertools import first
@@ -542,7 +548,9 @@ def create_ingress(extensions_v1_beta1: ExtensionsV1beta1Api, namespace, body) -
     :return: str
     """
     print("Create an ingress:")
-    extensions_v1_beta1.create_namespaced_ingress(namespace, body)
+    # extensions_v1_beta1.create_namespaced_ingress(namespace, body)
+    body = create_ingress_v1(namespace, body)
+
     print(f"Ingress created with name '{body['metadata']['name']}'")
     return body['metadata']['name']
 
@@ -557,7 +565,8 @@ def delete_ingress(extensions_v1_beta1: ExtensionsV1beta1Api, name, namespace) -
     :return:
     """
     print(f"Delete an ingress: {name}")
-    extensions_v1_beta1.delete_namespaced_ingress(name, namespace)
+    # extensions_v1_beta1.delete_namespaced_ingress(name, namespace)
+    delete_ingress_v1(name, namespace)
     ensure_item_removal(extensions_v1_beta1.read_namespaced_ingress, name, namespace)
     print(f"Ingress was removed with name '{name}'")
 
@@ -591,7 +600,8 @@ def replace_ingress(extensions_v1_beta1: ExtensionsV1beta1Api, name, namespace, 
     :return: str
     """
     print(f"Replace a Ingress: {name}")
-    resp = extensions_v1_beta1.replace_namespaced_ingress(name, namespace, body)
+    # resp = extensions_v1_beta1.replace_namespaced_ingress(name, namespace, body)
+    resp = replace_ingress_v1(name, namespace)
     print(f"Ingress replaced with name '{name}'")
     return resp.metadata.name
 
