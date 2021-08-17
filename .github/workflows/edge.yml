@@ -3,7 +3,7 @@ name: Edge
 on:
   push:
     branches:
-      - master
+      - tests/update-gh-wrkflw
     paths-ignore:
       - 'docs/**'
       - 'examples/**'
@@ -226,7 +226,7 @@ jobs:
           sed -i 's|server:.*|server: https://${{ steps.k8s.outputs.cluster_ip }}:6443|' kube-${{ github.run_id }}
       - name: Run Smoke Tests
         run: |
-          touch tests-${{ steps.k8s.outputs.cluster }}.html
+          touch ${{ github.workspace }}/tests/tests-${{ steps.k8s.outputs.cluster }}.html
           docker run --rm \
           --name test-runner-${{ github.run_id }} \
           --network=kind \
@@ -241,7 +241,6 @@ jobs:
           --self-contained-html \
           --show-ic-logs=yes --profile \
           -m ${{ matrix.marker }}
-        working-directory: ./tests
       - name: Upload Test Results
         uses: actions/upload-artifact@v2
         with:
