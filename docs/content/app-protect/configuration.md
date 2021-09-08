@@ -107,7 +107,7 @@ To add the [App Protect log configurations](/nginx-app-protect/configuration/#se
 
    > **Note**: The fields from the JSON must be presented in the YAML *exactly* the same, in name and level. The Ingress Controller will transform the YAML into a valid JSON App Protect log config.
 
-For example, say you want to [log state changing requests](/nginx-app-protect/troubleshooting/#log-state-changing-requests) for your Ingress resources using App Protect. The App Protect log configuration looks like this:
+For example, say you want to [log state changing requests](/nginx-app-protect/configuration/#security-log-configuration-file) for your Ingress resources using App Protect. The App Protect log configuration looks like this:
 
 ```json
 {
