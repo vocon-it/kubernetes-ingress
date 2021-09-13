@@ -24,7 +24,7 @@ The table below summarizes the key difference between nginxinc/kubernetes-ingres
 | --- | --- | --- | --- |
 | **Fundamental** |
 | Authors | Kubernetes community | NGINX Inc and community |  NGINX Inc and community |
-| NGINX version | [Custom](https://github.com/kubernetes/ingress-nginx/tree/v1.12.1/images/nginx) NGINX build that includes several third-party modules | NGINX official mainline [build](https://github.com/nginxinc/docker-nginx) | NGINX Plus |
+| NGINX version | [Custom](https://github.com/kubernetes/ingress-nginx/tree/master/images/nginx) NGINX build that includes several third-party modules | NGINX official mainline [build](https://github.com/nginxinc/docker-nginx) | NGINX Plus |
 | Commercial support | N/A | N/A | Included |
 | **Load balancing configuration via the Ingress resource** |
 | Merging Ingress rules with the same host | Supported | Supported via [Mergeable Ingresses](https://github.com/nginxinc/kubernetes-ingress/tree/v1.12.1/examples/mergeable-ingress-types) | Supported via [Mergeable Ingresses](https://github.com/nginxinc/kubernetes-ingress/tree/v1.12.1/examples/mergeable-ingress-types) |
