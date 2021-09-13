@@ -131,4 +131,4 @@ deny all;
 
 ## Example
 
-See the [custom annotations example](https://github.com/nginxinc/kubernetes-ingress/blob/v1.12.1/examples/custom-annotations).
+See the [custom annotations example](https://github.com/nginxinc/kubernetes-ingress/tree/master/examples/custom-annotations).
