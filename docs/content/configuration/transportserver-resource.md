@@ -378,4 +378,4 @@ The [ConfigMap](/nginx-ingress-controller/configuration/global-configuration/con
 ## Limitations
 
 The TransportServer resource is a preview feature. Currently, it comes with the following limitation:
-* When using TLS Passthrough, it is not possible to configure [Proxy Protocol](https://github.com/nginxinc/kubernetes-ingress/tree/v1.12.1/examples/proxy-protocol) for port 443 both for regular HTTPS and TLS Passthrough traffic.
+* When using TLS Passthrough, it is not possible to configure [Proxy Protocol](https://github.com/nginxinc/kubernetes-ingress/blob/v1.12.1/examples/proxy-protocol) for port 443 both for regular HTTPS and TLS Passthrough traffic.
