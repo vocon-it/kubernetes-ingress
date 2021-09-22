@@ -117,6 +117,8 @@ RUN --mount=type=bind,from=debian,source=/nginx_version,target=/tmp/nginx_versio
 	&& printf "%s\n" "[nginx]" "name=nginx repo" \
 	"baseurl=https://nginx.org/packages/mainline/centos/${version}/\$basearch/" \
 	"gpgcheck=1" "enabled=1" "module_hotfixes=true" > /etc/yum.repos.d/nginx.repo \
+	# Temporary fix for CVE-2021-36222
+	&& microdnf --nodocs install -y krb5-libs \
 	&& microdnf --nodocs install -y nginx-${NGINX_VERSION} \
 	&& rm /etc/yum.repos.d/nginx.repo
 
