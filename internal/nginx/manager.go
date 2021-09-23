@@ -522,7 +522,7 @@ func (lm *LocalManager) AppProtectPluginQuit() {
 
 // AppProtectDosAgentQuit gracefully ends AppProtect Agent.
 func (lm *LocalManager) AppProtectDosAgentQuit() {
-	glog.V(3).Info("Quitting AppProtectDos Agent")
+	glog.V(3).Info("Quitting AppProtectDos Agent, hello")
 	killcmd := fmt.Sprintf("kill %d", lm.appProtectDosAgentPid)
 	if err := shellOut(killcmd); err != nil {
 		glog.Fatalf("Failed to quit AppProtect Agent: %v", err)
@@ -536,15 +536,15 @@ func (lm *LocalManager) AppProtectDosAgentStart(apdaDone chan error, debug bool,
 	// Perform installation by adminstall
 	appProtectDosAgentInstallCmdFull := appProtectDosAgentInstallCmd
 
-	if (maxDaemon != 0) {
+	if maxDaemon != 0 {
 		appProtectDosAgentInstallCmdFull += " -d " + strconv.FormatUint(maxDaemon, 10)
 	}
 
-	if (maxWorkers != 0) {
+	if maxWorkers != 0 {
 		appProtectDosAgentInstallCmdFull += " -w " + strconv.FormatUint(maxWorkers, 10)
 	}
 
-	if (memory != 0) {
+	if memory != 0 {
 		appProtectDosAgentInstallCmdFull += " -m " + strconv.FormatUint(memory, 10)
 	}
 
@@ -561,8 +561,8 @@ func (lm *LocalManager) AppProtectDosAgentStart(apdaDone chan error, debug bool,
 	}
 
 	cmd := exec.Command("sh", "-c", appProtectDosAgentCmd)
-    cmd.Stdout = os.Stdout
-    cmd.Stderr = os.Stdout
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stdout
 	if err := cmd.Start(); err != nil {
 		glog.Fatalf("Failed to start AppProtectDos Agent: %v", err)
 	}
