@@ -14,9 +14,9 @@ import (
 	conf_v1alpha1 "github.com/nginxinc/kubernetes-ingress/pkg/apis/configuration/v1alpha1"
 	k8s_nginx "github.com/nginxinc/kubernetes-ingress/pkg/client/clientset/versioned"
 	api_v1 "k8s.io/api/core/v1"
-	networking "k8s.io/api/networking/v1beta1"
+	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	typednetworking "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
+	typednetworking "k8s.io/client-go/kubernetes/typed/networking/v1"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -44,6 +44,7 @@ type statusUpdater struct {
 	transportServerLister    cache.Store
 	policyLister             cache.Store
 	confClient               k8s_nginx.Interface
+	hasCorrectIngressClass   func(interface{}) bool
 }
 
 func (su *statusUpdater) UpdateExternalEndpointsForResources(resource []Resource) error {
@@ -131,7 +132,7 @@ func (su *statusUpdater) updateIngressWithStatus(ing networking.Ingress, status 
 	}
 
 	ingCopy.Status.LoadBalancer.Ingress = status
-	clientIngress := su.client.NetworkingV1beta1().Ingresses(ingCopy.Namespace)
+	clientIngress := su.client.NetworkingV1().Ingresses(ingCopy.Namespace)
 	_, err = clientIngress.UpdateStatus(context.TODO(), ingCopy, metav1.UpdateOptions{})
 	if err != nil {
 		glog.V(3).Infof("error setting ingress status: %v", err)
@@ -200,8 +201,10 @@ func (su *statusUpdater) saveStatus(ips []string) {
 	su.status = statusIngs
 }
 
-var intPorts = [2]int32{80, 443}
-var stringPorts = [2]string{"http", "https"}
+var (
+	intPorts    = [2]int32{80, 443}
+	stringPorts = [2]string{"http", "https"}
+)
 
 func isRequiredPort(port intstr.IntOrString) bool {
 	if port.Type == intstr.Int {
@@ -510,6 +513,10 @@ func (su *statusUpdater) UpdateVirtualServerRouteStatusWithReferencedBy(vsr *con
 
 	vsrCopy := vsrLatest.(*conf_v1.VirtualServerRoute).DeepCopy()
 
+	if !hasVsrStatusChanged(vsrCopy, state, reason, message, referencedByString) {
+		return nil
+	}
+
 	vsrCopy.Status.State = state
 	vsrCopy.Status.Reason = reason
 	vsrCopy.Status.Message = message
@@ -633,6 +640,11 @@ func (su *statusUpdater) UpdatePolicyStatus(pol *v1.Policy, state string, reason
 	}
 	if !exists {
 		glog.V(3).Infof("Policy doesn't exist in Store")
+		return nil
+	}
+
+	if !su.hasCorrectIngressClass(polLatest) {
+		glog.V(3).Infof("ignoring policy with incorrect ingress class")
 		return nil
 	}
 

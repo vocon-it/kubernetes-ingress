@@ -2,12 +2,20 @@
 title: Which Ingress Controller Do I Need?
 description: 
 weight: 200
+<<<<<<< HEAD
+=======
+draft: true
+>>>>>>> origin/release-2.0
 doctypes: ["concept"]
 toc: true
 aliases: 
   - /nginx-ingress-controllers/
 ---
 
+<<<<<<< HEAD
+=======
+<<<<<<<< HEAD:docs/content/intro/nginx-ingress-controllers.md
+>>>>>>> origin/release-2.0
 
 There are two NGINX-based Ingress controller implementations out there: the one made by NGINX ([nginxinc/kubernetes-ingress](https://github.com/nginxinc/kubernetes-ingress)) and the one made by Kubernetes ([kubernetes/ingress-nginx](https://github.com/kubernetes/ingress-nginx)). In this document, we explain the key differences between those implementations. This information should help you to choose an appropriate implementation for your requirements or move from one implementation to the other.
 
@@ -17,7 +25,11 @@ If you are unsure about which implementation you are using, check the container 
 
 ## The Key Differences
 
+<<<<<<< HEAD
 The table below summarizes the key difference between nginxinc/kubernetes-ingress and kubernetes/ingress-nginx Ingress controllers. Note that the table has two columns for the nginxinc/kubernetes-ingress Ingress controller, as it can be used both with NGINX and NGINX Plus. For more information about nginxinc/kubernetes-ingress with NGINX Plus, read [here](nginx-plus.md).
+=======
+The table below summarizes the key difference between nginxinc/kubernetes-ingress and kubernetes/ingress-nginx Ingress controllers. Note that the table has two columns for the nginxinc/kubernetes-ingress Ingress controller, as it can be used both with NGINX and NGINX Plus. For more information about nginxinc/kubernetes-ingress with NGINX Plus, read the [NGINX Ingress Controller with NGINX Plus](/nginx-ingress-controller/intro/nginx-plus) documentation.
+>>>>>>> origin/release-2.0
 
 {{% table %}} 
 | Aspect or Feature | kubernetes/ingress-nginx | nginxinc/kubernetes-ingress with NGINX | nginxinc/kubernetes-ingress with NGINX Plus |
@@ -27,11 +39,19 @@ The table below summarizes the key difference between nginxinc/kubernetes-ingres
 | NGINX version | [Custom](https://github.com/kubernetes/ingress-nginx/tree/master/images/nginx) NGINX build that includes several third-party modules | NGINX official mainline [build](https://github.com/nginxinc/docker-nginx) | NGINX Plus |
 | Commercial support | N/A | N/A | Included |
 | **Load balancing configuration via the Ingress resource** |
+<<<<<<< HEAD
 | Merging Ingress rules with the same host | Supported | Supported via [Mergeable Ingresses](../examples/mergeable-ingress-types) | Supported via [Mergeable Ingresses](../examples/mergeable-ingress-types) |
 | HTTP load balancing extensions - Annotations | See the [supported annotations](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/) | See the [supported annotations](https://docs.nginx.com/nginx-ingress-controller/configuration/ingress-resources/advanced-configuration-with-annotations/) | See the [supported annotations](https://docs.nginx.com/nginx-ingress-controller/configuration/ingress-resources/advanced-configuration-with-annotations/)|
 | HTTP load balancing extensions -- ConfigMap | See the [supported ConfigMap keys](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/) | See the [supported ConfigMap keys](https://docs.nginx.com/nginx-ingress-controller/configuration/global-configuration/configmap-resource/) | See the [supported ConfigMap keys](https://docs.nginx.com/nginx-ingress-controller/configuration/global-configuration/configmap-resource/) |
 | TCP/UDP | Supported via a ConfigMap | Supported via custom resources | Supported via custom resources |
 | Websocket  | Supported | Supported via an [annotation](../examples/websocket) | Supported via an [annotation](../examples/websocket) |
+=======
+| Merging Ingress rules with the same host | Supported | Supported via [Mergeable Ingresses](https://github.com/nginxinc/kubernetes-ingress/tree/v2.0.0/examples/mergeable-ingress-types) | Supported via [Mergeable Ingresses](https://github.com/nginxinc/kubernetes-ingress/tree/v2.0.0/examples/mergeable-ingress-types) |
+| HTTP load balancing extensions - Annotations | See the [supported annotations](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/) | See the [supported annotations](https://docs.nginx.com/nginx-ingress-controller/configuration/ingress-resources/advanced-configuration-with-annotations/) | See the [supported annotations](https://docs.nginx.com/nginx-ingress-controller/configuration/ingress-resources/advanced-configuration-with-annotations/)|
+| HTTP load balancing extensions -- ConfigMap | See the [supported ConfigMap keys](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/) | See the [supported ConfigMap keys](https://docs.nginx.com/nginx-ingress-controller/configuration/global-configuration/configmap-resource/) | See the [supported ConfigMap keys](https://docs.nginx.com/nginx-ingress-controller/configuration/global-configuration/configmap-resource/) |
+| TCP/UDP | Supported via a ConfigMap | Supported via custom resources | Supported via custom resources |
+| Websocket  | Supported | Supported via an [annotation](https://github.com/nginxinc/kubernetes-ingress/tree/v2.0.0/examples/websocket) | Supported via an [annotation](https://github.com/nginxinc/kubernetes-ingress/tree/v2.0.0/examples/websocket) |
+>>>>>>> origin/release-2.0
 | TCP SSL Passthrough | Supported via a ConfigMap | Supported via custom resources | Supported via custom resources |
 | JWT validation | Not supported | Not supported | Supported |
 | Session persistence | Supported via a third-party module | Not supported | Supported |
@@ -62,3 +82,9 @@ Notes:
 ## How to Swap an Ingress Controller
 
 If you decide to swap an Ingress controller implementation, be prepared to deal with the differences that were mentioned in the previous section. At minimum, you need to start using a different deployment manifest.
+<<<<<<< HEAD
+=======
+========
+This doc is now available at https://docs.nginx.com/nginx-ingress-controller/intro/nginx-ingress-controllers/
+>>>>>>>> origin/release-2.0:docs/nginx-ingress-controllers.md
+>>>>>>> origin/release-2.0

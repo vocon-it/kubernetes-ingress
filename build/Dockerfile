@@ -1,26 +1,29 @@
-# syntax=docker/dockerfile:1.2
+# syntax=docker/dockerfile:1.3
 ARG BUILD_OS=debian
-ARG NGINX_PLUS_VERSION=r24
+ARG NGINX_PLUS_VERSION=r25
 ARG UBI_VERSION=8
 ARG FILES=
 
 ############################################# Base image for Debian #############################################
-FROM nginx:1.21.0 AS debian
+FROM nginx:1.21.3 AS debian
 
 RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y libcap2-bin \
-	&& rm -rf /var/lib/apt/lists/*
+	&& rm -rf /var/lib/apt/lists/* \
+	&& echo $NGINX_VERSION > nginx_version
 
 
 ############################################# Base image for Alpine #############################################
 # docker.io/library/nginx is a temporary workaround for Dependabot to see this as different from the one used in Debian
-FROM docker.io/library/nginx:1.21.0-alpine AS alpine
+FROM docker.io/library/nginx:1.21.3-alpine AS alpine
 
-RUN apk add --no-cache libcap
+RUN apk add --no-cache libcap \
+	# temporary fix for CVE-2021-22945
+	&& apk upgrade --no-cache curl libcurl
 
 
 ############################################# Base image for Alpine with NGINX Plus #############################################
-FROM alpine:3.13 as alpine-plus
+FROM alpine:3.14 as alpine-plus
 ARG NGINX_PLUS_VERSION
 
 RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/apk/cert.pem,mode=0644 \
@@ -40,8 +43,6 @@ RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode
 	--mount=type=secret,id=nginx-repo.key,dst=/etc/ssl/nginx/nginx-repo.key,mode=0644 \
 	apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y ca-certificates gnupg curl apt-transport-https libcap2-bin \
-	# temporary fix for CVE-2021-3520, CVE-2021-33560, CVE-2021-20231, CVE-2021-20305, CVE-2021-20305
-	&& apt-get install -y liblz4-1 libgcrypt20 libgnutls30 libhogweed4 libnettle6 \
 	&& curl -sSL https://cs.nginx.com/static/keys/nginx_signing.key | gpg --dearmor > /etc/apt/trusted.gpg.d/nginx_signing.gpg \
 	&& curl -sSL -o /etc/apt/apt.conf.d/90pkgs-nginx https://cs.nginx.com/static/files/90pkgs-nginx \
 	&& printf "%s\n" "Acquire::https::pkgs.nginx.com::User-Agent  \"k8s-ic-$IC_VERSION-apt\";" >> /etc/apt/apt.conf.d/90pkgs-nginx \
@@ -108,9 +109,10 @@ COPY --chown=nginx:0 LICENSE /licenses/
 
 ############################################# Base image for UBI OSS #############################################
 FROM ubi-base AS ubi
-ARG NGINX_VERSION
 
-RUN rpm --import https://nginx.org/keys/nginx_signing.key \
+RUN --mount=type=bind,from=debian,source=/nginx_version,target=/tmp/nginx_version \
+	export NGINX_VERSION=$(</tmp/nginx_version) \
+	&& rpm --import https://nginx.org/keys/nginx_signing.key \
 	&& version=$(grep -E -o '[0-9]+\.[0-9]+' /etc/redhat-release | cut -d"." -f1) \
 	&& printf "%s\n" "[nginx]" "name=nginx repo" \
 	"baseurl=https://nginx.org/packages/mainline/centos/${version}/\$basearch/" \
@@ -137,82 +139,33 @@ ARG NGINX_PLUS_VERSION
 RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode=0644 \
 	--mount=type=secret,id=nginx-repo.key,dst=/etc/ssl/nginx/nginx-repo.key,mode=0644 \
 	--mount=type=secret,id=rhel_license,dst=/tmp/rhel_license,mode=0644 \
-	set -x \
-	&& source /tmp/rhel_license \
-	&& curl -sS https://cs.nginx.com/static/files/app-protect-7.repo > /etc/yum.repos.d/app-protect-7.repo \
+	source /tmp/rhel_license \
 	&& subscription-manager register --org=${RHEL_ORGANIZATION} --activationkey=${RHEL_ACTIVATION_KEY} || true \
-	&& subscription-manager attach --auto \
+	&& subscription-manager attach \
+	&& set -x \
+	&& curl -sS https://cs.nginx.com/static/files/app-protect-7.repo > /etc/yum.repos.d/app-protect-7.repo \
 	&& subscription-manager repos --enable rhel-7-server-optional-rpms --enable rhel-7-server-extras-rpms \
 	&& rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
 	&& yum clean all \
 	&& yum install -y nginx-plus-module-appprotect-${NGINX_PLUS_VERSION} $(repoquery app-protect-${NGINX_PLUS_VERSION#r}*) app-protect-attack-signatures app-protect-threat-campaigns \
-	&& rm /etc/yum.repos.d/app-protect-7.repo
+	&& rm /etc/yum.repos.d/app-protect-7.repo \
+	&& subscription-manager unregister
 
 # Uncomment the lines below if you want to install a custom CA certificate
 # COPY build/*.crt  /etc/pki/ca-trust/source/anchors/
 # RUN update-ca-trust extract
 
 
-############################################# Build image for Opentracing Builder #############################################
-FROM debian as opentracing-builder
-ARG NGINX_OPENTRACING=0.10.0
-ARG OPENTRACING_VERSION=1.6.0
-
-RUN apt-get update && apt-get install -y -q --fix-missing --no-install-recommends \
-	autoconf \
-	automake \
-	build-essential \
-	cmake \
-	git \
-	libcurl4-openssl-dev \
-	libgeoip-dev \
-	liblmdb-dev \
-	libpcre3-dev \
-	libprotobuf-dev \
-	libssl-dev \
-	libtool \
-	libxml2-dev \
-	libyajl-dev \
-	pkgconf \
-	protobuf-compiler \
-	zlib1g-dev
-
-# Get nginx to build against
-RUN curl -sS -O -L http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
-	&& tar zxvf nginx-${NGINX_VERSION}.tar.gz && rm -f nginx-${NGINX_VERSION}.tar.gz \
-	&& git clone --branch v${NGINX_OPENTRACING} https://github.com/opentracing-contrib/nginx-opentracing.git \
-	&& git clone --branch v${OPENTRACING_VERSION} https://github.com/opentracing/opentracing-cpp.git
-
-WORKDIR /opentracing-cpp/.build
-RUN	cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DBUILD_STATIC_LIBS=OFF -DBUILD_MOCKTRACER=OFF -DENABLE_LINTING=OFF .. && \
-	make && make install
-
-WORKDIR /nginx-${NGINX_VERSION}
-RUN ./configure \
-	--with-compat --with-debug \
-	--add-dynamic-module=/nginx-opentracing/opentracing && \
-	make modules
-
-
-############################################# Build image for Trace downloader #############################################
-FROM debian AS tracer-downloader
-
-ARG JAEGER_VERSION=v0.4.2
-
-RUN apt-get update \
-	&& apt-get install --no-install-recommends --no-install-suggests -y ca-certificates apt-transport-https wget \
-	&& wget -nv https://github.com/jaegertracing/jaeger-client-cpp/releases/download/${JAEGER_VERSION}/libjaegertracing_plugin.linux_amd64.so -O /usr/local/lib/libjaegertracing_plugin.so
+############################################# Base image containing libs for Opentracing #############################################
+FROM opentracing/nginx-opentracing:nginx-1.21.3 as opentracing-lib
 
 
 ############################################# Build image for Opentracing #############################################
 FROM debian as opentracing
-ARG OPENTRACING_VERSION=1.6.0
 
-COPY --from=opentracing-builder /nginx-${NGINX_VERSION}/objs/ngx_http_opentracing_module.so /usr/lib/nginx/modules/ngx_http_opentracing_module.so
-COPY --from=opentracing-builder /usr/local/lib/libopentracing.so.${OPENTRACING_VERSION} /usr/local/lib/libopentracing.so.1
-COPY --from=tracer-downloader /usr/local/lib/libjaegertracing_plugin.so /usr/local/lib/libjaegertracing_plugin.so
-
-RUN ldconfig
+RUN --mount=type=bind,from=opentracing-lib,target=/tmp/ cp -av /tmp/usr/local/lib/libopentracing.so* /tmp/usr/local/lib/libjaegertracing*so* /tmp/usr/local/lib/libzipkin*so* /tmp/usr/local/lib/libdd*so* /tmp/usr/local/lib/libyaml*so* /usr/local/lib/ \
+	&& cp -av /tmp/usr/lib/nginx/modules/ngx_http_opentracing_module.so /usr/lib/nginx/modules/ \
+	&& ldconfig
 
 
 ############################################# Build image for Opentracing with NGINX Plus #############################################
@@ -225,7 +178,8 @@ RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode
 	&& apt-get install --no-install-recommends --no-install-suggests -y nginx-plus-module-opentracing-${NGINX_PLUS_VERSION} \
 	&& rm -rf /var/lib/apt/lists/*
 
-COPY --from=tracer-downloader /usr/local/lib/libjaegertracing_plugin.so /usr/local/lib/libjaegertracing_plugin.so
+RUN --mount=type=bind,from=opentracing-lib,target=/tmp/ cp -av /tmp/usr/local/lib/libjaegertracing*so* /tmp/usr/local/lib/libzipkin*so* /tmp/usr/local/lib/libdd*so* /tmp/usr/local/lib/libyaml*so* /usr/local/lib/ \
+	&& ldconfig
 
 
 ############################################# Create common files for NGINX Plus #############################################
@@ -262,6 +216,7 @@ ARG BUILD_OS
 ARG IC_VERSION
 ARG GIT_COMMIT
 ARG DATE
+ARG TARGETPLATFORM
 
 RUN mkdir -p /var/lib/nginx /etc/nginx/secrets /etc/nginx/stream-conf.d \
 	&& setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx 'cap_net_bind_service=+ep' /usr/sbin/nginx-debug \
@@ -284,18 +239,16 @@ STOPSIGNAL SIGTERM
 ENTRYPOINT ["/nginx-ingress"]
 USER nginx
 
-LABEL org.opencontainers.image.title="NGINX Ingress Controller for Kubernetes"
-LABEL org.opencontainers.image.documentation="https://docs.nginx.com/nginx-ingress-controller"
-LABEL org.opencontainers.image.source="https://github.com/nginxinc/kubernetes-ingress"
-LABEL org.opencontainers.image.vendor="NGINX Inc <kubernetes@nginx.com>"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
-LABEL org.opencontainers.image.version="${IC_VERSION}-${BUILD_OS}-${NGINX_PLUS_VERSION}${NGINX_VERSION}"
+LABEL org.opencontainers.image.version="${IC_VERSION}"
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 LABEL org.opencontainers.image.created="${DATE}"
+LABEL org.nginx.kic.image.build.target="${TARGETPLATFORM}"
+LABEL org.nginx.kic.image.build.os="${BUILD_OS}"
+LABEL org.nginx.kic.image.build.nginx.vesion="${NGINX_PLUS_VERSION}${NGINX_VERSION}"
 
 
 ############################################# Build nginx-ingress in golang container #############################################
-FROM golang:1.16-alpine AS builder
+FROM golang:1.17-alpine AS builder
 ARG IC_VERSION
 ARG GIT_COMMIT
 ARG DATE
@@ -310,12 +263,18 @@ RUN CGO_ENABLED=0 GO111MODULE=on GOOS=linux GOARCH=$TARGETARCH go build -trimpat
 
 ############################################# Create image with nginx-ingress built in container #############################################
 FROM common AS container
+
+LABEL org.nginx.kic.image.build.version="container"
+
 COPY --chown=nginx:0 --from=builder /nginx-ingress /
 
 
 ############################################# Create image with nginx-ingress built locally #############################################
 FROM common AS local
-COPY --chown=nginx:0 nginx-ingress /
+
+LABEL org.nginx.kic.image.build.version="local"
+
+COPY --chown=nginx:0 ./nginx-ingress /
 
 
 ############################################# Create image with nginx-ingress built by GoReleaser #############################################
@@ -323,4 +282,15 @@ FROM common AS goreleaser
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-COPY --chown=nginx:0 dist/kubernetes-ingress_linux_$TARGETARCH${TARGETVARIANT:+_7}/nginx-ingress /
+LABEL org.nginx.kic.image.build.version="goreleaser"
+
+COPY --chown=nginx:0 ./dist/kubernetes-ingress_linux_$TARGETARCH${TARGETVARIANT:+_7}/nginx-ingress /
+
+
+############################################# Create image with nginx-ingress built by GoReleaser for AWS Marketplace #############################################
+FROM common AS aws
+ARG TARGETARCH
+
+LABEL org.nginx.kic.image.build.version="aws"
+
+COPY --chown=nginx:0 ./dist/aws_linux_$TARGETARCH/nginx-ingress /

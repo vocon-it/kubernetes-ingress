@@ -1,15 +1,17 @@
 PREFIX = nginx/nginx-ingress
-GIT_COMMIT = $(shell git rev-parse HEAD)
+GIT_COMMIT = $(shell git rev-parse HEAD || echo unknown)
 GIT_COMMIT_SHORT = $(shell echo ${GIT_COMMIT} | cut -c1-7)
-GIT_TAG = $(shell git describe --tags --abbrev=0)
+GIT_TAG = $(shell git describe --tags --abbrev=0 || echo untagged)
 DATE = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 VERSION = $(GIT_TAG)-SNAPSHOT-$(GIT_COMMIT_SHORT)
 TAG = $(VERSION:v%=%)
 TARGET ?= local
+NAP_PLUS_VERSION ?= r24
 
 override DOCKER_BUILD_OPTIONS += --build-arg IC_VERSION=$(VERSION) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg DATE=$(DATE)
 DOCKER_CMD = docker build $(DOCKER_BUILD_OPTIONS) --target $(TARGET) -f build/Dockerfile -t $(PREFIX):$(TAG) .
 PLUS_ARGS = --build-arg PLUS=-plus --build-arg FILES=plus-common --secret id=nginx-repo.crt,src=nginx-repo.crt --secret id=nginx-repo.key,src=nginx-repo.key
+NAP_ARGS = --build-arg FILES=nap-common --build-arg NGINX_PLUS_VERSION=$(NAP_PLUS_VERSION)
 
 export DOCKER_BUILDKIT = 1
 
@@ -24,7 +26,7 @@ all: test lint verify-codegen update-crds debian-image
 
 .PHONY: lint
 lint: ## Run linter
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint run
+	docker run --pull always --rm -v $(shell pwd):/kubernetes-ingress -w /kubernetes-ingress -v $(shell go env GOCACHE):/cache/go -e GOCACHE=/cache/go -e GOLANGCI_LINT_CACHE=/cache/go -v $(shell go env GOPATH)/pkg:/go/pkg golangci/golangci-lint:latest golangci-lint --color always run -v
 
 .PHONY: test
 test: ## Run tests
@@ -55,6 +57,11 @@ ifeq (${TARGET},local)
 	CGO_ENABLED=0 GO111MODULE=on GOOS=linux go build -trimpath -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${GIT_COMMIT} -X main.date=$(DATE)" -o nginx-ingress github.com/nginxinc/kubernetes-ingress/cmd/nginx-ingress
 endif
 
+.PHONY: build-goreleaser
+build-goreleaser: ## Build Ingress Controller binary using GoReleaser
+	@goreleaser -v || (code=$$?; printf "\033[0;31mError\033[0m: there was a problem with GoReleaser. Follow the docs to install it https://goreleaser.com/install\n"; exit $$code)
+	GOPATH=$(shell go env GOPATH) goreleaser build --rm-dist --debug --snapshot --id kubernetes-ingress
+
 .PHONY: debian-image
 debian-image: build ## Create Docker image for Ingress Controller (debian)
 	$(DOCKER_CMD) --build-arg BUILD_OS=debian
@@ -73,11 +80,11 @@ debian-image-plus: build ## Create Docker image for Ingress Controller (nginx pl
 
 .PHONY: debian-image-nap-plus
 debian-image-nap-plus: build ## Create Docker image for Ingress Controller (nginx plus with nap)
-	$(DOCKER_CMD) $(PLUS_ARGS) --build-arg BUILD_OS=debian-plus-nap --build-arg FILES=nap-common
+	$(DOCKER_CMD) $(PLUS_ARGS) $(NAP_ARGS) --build-arg BUILD_OS=debian-plus-nap
 
 .PHONY: openshift-image
 openshift-image: build ## Create Docker image for Ingress Controller (ubi)
-	$(DOCKER_CMD) --build-arg BUILD_OS=ubi --build-arg NGINX_VERSION=$(shell cat build/Dockerfile | grep -m1 "FROM nginx:" | cut -d":" -f2 | cut -d" " -f1)
+	$(DOCKER_CMD) --build-arg BUILD_OS=ubi
 
 .PHONY: openshift-image-plus
 openshift-image-plus: build ## Create Docker image for Ingress Controller (ubi with plus)
@@ -85,7 +92,7 @@ openshift-image-plus: build ## Create Docker image for Ingress Controller (ubi w
 
 .PHONY: openshift-image-nap-plus
 openshift-image-nap-plus: build ## Create Docker image for Ingress Controller (ubi with plus and nap)
-	$(DOCKER_CMD) $(PLUS_ARGS) --secret id=rhel_license,src=rhel_license --build-arg BUILD_OS=ubi-plus-nap --build-arg FILES=nap-common --build-arg UBI_VERSION=7
+	$(DOCKER_CMD) $(PLUS_ARGS) $(NAP_ARGS) --secret id=rhel_license,src=rhel_license --build-arg BUILD_OS=ubi-plus-nap --build-arg UBI_VERSION=7
 
 .PHONY: debian-image-opentracing
 debian-image-opentracing: build ## Create Docker image for Ingress Controller (with opentracing)

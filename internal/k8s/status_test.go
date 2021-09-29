@@ -10,7 +10,7 @@ import (
 	conf_v1alpha1 "github.com/nginxinc/kubernetes-ingress/pkg/apis/configuration/v1alpha1"
 	fake_v1alpha1 "github.com/nginxinc/kubernetes-ingress/pkg/client/clientset/versioned/fake"
 	v1 "k8s.io/api/core/v1"
-	networking "k8s.io/api/networking/v1beta1"
+	networking "k8s.io/api/networking/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -35,7 +35,8 @@ func TestUpdateTransportServerStatus(t *testing.T) {
 		&conf_v1alpha1.TransportServerList{
 			Items: []conf_v1alpha1.TransportServer{
 				*ts,
-			}})
+			},
+		})
 
 	tsLister := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 
@@ -83,7 +84,8 @@ func TestUpdateTransportServerStatusIgnoreNoChange(t *testing.T) {
 		&conf_v1alpha1.TransportServerList{
 			Items: []conf_v1alpha1.TransportServer{
 				*ts,
-			}})
+			},
+		})
 
 	tsLister, _ := cache.NewInformer(
 		cache.NewListWatchFromClient(
@@ -139,7 +141,8 @@ func TestUpdateTransportServerStatusMissingTransportServer(t *testing.T) {
 
 	fakeClient := fake_v1alpha1.NewSimpleClientset(
 		&conf_v1alpha1.TransportServerList{
-			Items: []conf_v1alpha1.TransportServer{}})
+			Items: []conf_v1alpha1.TransportServer{},
+		})
 
 	tsLister, _ := cache.NewInformer(
 		cache.NewListWatchFromClient(
@@ -199,7 +202,7 @@ func TestStatusUpdateWithExternalStatusAndExternalService(t *testing.T) {
 	)
 	ingLister := storeToIngressLister{}
 	ingLister.Store, _ = cache.NewInformer(
-		cache.NewListWatchFromClient(fakeClient.NetworkingV1beta1().RESTClient(), "ingresses", "nginx-ingress", fields.Everything()),
+		cache.NewListWatchFromClient(fakeClient.NetworkingV1().RESTClient(), "ingresses", "nginx-ingress", fields.Everything()),
 		&networking.Ingress{}, 2, nil)
 
 	err := ingLister.Store.Add(&ing)
@@ -219,7 +222,7 @@ func TestStatusUpdateWithExternalStatusAndExternalService(t *testing.T) {
 	if err != nil {
 		t.Errorf("error clearing ing status: %v", err)
 	}
-	ings, _ := fakeClient.NetworkingV1beta1().Ingresses("namespace").List(context.TODO(), meta_v1.ListOptions{})
+	ings, _ := fakeClient.NetworkingV1().Ingresses("namespace").List(context.TODO(), meta_v1.ListOptions{})
 	ingf := ings.Items[0]
 	if !checkStatus("", ingf) {
 		t.Errorf("expected: %v actual: %v", "", ingf.Status.LoadBalancer.Ingress[0])
@@ -230,7 +233,7 @@ func TestStatusUpdateWithExternalStatusAndExternalService(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ := fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ := fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("1.1.1.1", *ring) {
 		t.Errorf("expected: %v actual: %v", "", ring.Status.LoadBalancer.Ingress)
 	}
@@ -253,7 +256,7 @@ func TestStatusUpdateWithExternalStatusAndExternalService(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ = fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ = fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("1.1.1.1", *ring) {
 		t.Errorf("expected: %v actual: %v", "1.1.1.1", ring.Status.LoadBalancer.Ingress)
 	}
@@ -263,7 +266,7 @@ func TestStatusUpdateWithExternalStatusAndExternalService(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ = fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ = fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("2.2.2.2", *ring) {
 		t.Errorf("expected: %v actual: %v", "2.2.2.2", ring.Status.LoadBalancer.Ingress)
 	}
@@ -273,7 +276,7 @@ func TestStatusUpdateWithExternalStatusAndExternalService(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ = fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ = fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("", *ring) {
 		t.Errorf("expected: %v actual: %v", "", ring.Status.LoadBalancer.Ingress)
 	}
@@ -302,7 +305,7 @@ func TestStatusUpdateWithExternalStatusAndIngressLink(t *testing.T) {
 	)
 	ingLister := storeToIngressLister{}
 	ingLister.Store, _ = cache.NewInformer(
-		cache.NewListWatchFromClient(fakeClient.NetworkingV1beta1().RESTClient(), "ingresses", "nginx-ingress", fields.Everything()),
+		cache.NewListWatchFromClient(fakeClient.NetworkingV1().RESTClient(), "ingresses", "nginx-ingress", fields.Everything()),
 		&networking.Ingress{}, 2, nil)
 
 	err := ingLister.Store.Add(&ing)
@@ -323,7 +326,7 @@ func TestStatusUpdateWithExternalStatusAndIngressLink(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ := fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ := fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("3.3.3.3", *ring) {
 		t.Errorf("expected: %v actual: %v", "3.3.3.3", ring.Status.LoadBalancer.Ingress)
 	}
@@ -333,7 +336,7 @@ func TestStatusUpdateWithExternalStatusAndIngressLink(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ = fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ = fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("1.1.1.1", *ring) {
 		t.Errorf("expected: %v actual: %v", "1.1.1.1", ring.Status.LoadBalancer.Ingress)
 	}
@@ -343,7 +346,7 @@ func TestStatusUpdateWithExternalStatusAndIngressLink(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ = fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ = fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("1.1.1.1", *ring) {
 		t.Errorf("expected: %v actual: %v", "1.1.1.1", ring.Status.LoadBalancer.Ingress)
 	}
@@ -353,7 +356,7 @@ func TestStatusUpdateWithExternalStatusAndIngressLink(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ = fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ = fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("1.1.1.1", *ring) {
 		t.Errorf("expected: %v actual: %v", "1.1.1.1", ring.Status.LoadBalancer.Ingress)
 	}
@@ -363,7 +366,7 @@ func TestStatusUpdateWithExternalStatusAndIngressLink(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ = fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ = fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("4.4.4.4", *ring) {
 		t.Errorf("expected: %v actual: %v", "4.4.4.4", ring.Status.LoadBalancer.Ingress)
 	}
@@ -373,7 +376,7 @@ func TestStatusUpdateWithExternalStatusAndIngressLink(t *testing.T) {
 	if err != nil {
 		t.Errorf("error updating ing status: %v", err)
 	}
-	ring, _ = fakeClient.NetworkingV1beta1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
+	ring, _ = fakeClient.NetworkingV1().Ingresses(ing.Namespace).Get(context.TODO(), ing.Name, meta_v1.GetOptions{})
 	if !checkStatus("", *ring) {
 		t.Errorf("expected: %v actual: %v", "", ring.Status.LoadBalancer.Ingress)
 	}
@@ -467,7 +470,6 @@ func TestHasVsStatusChanged(t *testing.T) {
 }
 
 func TestHasVsrStatusChanged(t *testing.T) {
-
 	referencedBy := "namespace/name"
 	state := "Valid"
 	reason := "AddedOrUpdated"
@@ -632,7 +634,6 @@ func TestIsRequiredPort(t *testing.T) {
 }
 
 func TestHasPolicyStatusChanged(t *testing.T) {
-
 	state := "Valid"
 	reason := "AddedOrUpdated"
 	msg := "Configuration was added or updated"

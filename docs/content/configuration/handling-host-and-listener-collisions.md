@@ -1,6 +1,6 @@
 ---
 title: Handling Host and Listener Collisions
-description: 
+description:
 weight: 1700
 doctypes: [""]
 toc: true
@@ -26,7 +26,7 @@ A host collision occurs when multiple Ingress, VirtualServer, and TransportServe
 Consider the following two resources:
 * `cafe-ingress` Ingress:
     ```yaml
-    apiVersion: networking.k8s.io/v1beta1
+    apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
       name: cafe-ingress
@@ -79,7 +79,7 @@ Similarly, if `cafe-ingress` was created first, it will win `cafe.example.com` a
 
 It is possible to merge configuration for multiple Ingress resources for the same host. One common use case for this approach is distributing resources across multiple namespaces. See the [Cross-namespace Configuration](/nginx-ingress-controller/configuration/ingress-resources/cross-namespace-configuration/) doc for more information.
 
-It is *not* possible to merge the configurations for multiple VirtualServer resources for the same host. However, you can split the VirtualServers into multiple VirtualServerRoute resources, which a single VirtualServer can then reference. See the [corresponding example](https://github.com/nginxinc/kubernetes-ingress/tree/v1.12.0/examples-of-custom-resources/cross-namespace-configuration) on GitHub.
+It is *not* possible to merge the configurations for multiple VirtualServer resources for the same host. However, you can split the VirtualServers into multiple VirtualServerRoute resources, which a single VirtualServer can then reference. See the [corresponding example](https://github.com/nginxinc/kubernetes-ingress/tree/v2.0.0/examples-of-custom-resources/cross-namespace-configuration) on GitHub.
 
 It is *not* possible to merge configuration for multiple TransportServer resources.
 

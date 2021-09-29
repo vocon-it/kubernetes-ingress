@@ -1,7 +1,7 @@
 ---
 title: Basic Configuration
 
-description: 
+description:
 weight: 1600
 doctypes: [""]
 toc: true
@@ -10,7 +10,7 @@ toc: true
 
 The example below shows a basic Ingress resource definition. It load balances requests for two services -- coffee and tea -- comprising a hypothetical *cafe* app hosted at `cafe.example.com`:
 ```yaml
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: cafe-ingress
@@ -24,13 +24,19 @@ spec:
     http:
       paths:
       - path: /tea
+        pathType: Prefix
         backend:
-          serviceName: tea-svc
-          servicePort: 80
+          service:
+            name: tea-svc
+            port:
+              number: 80
       - path: /coffee
+        pathType: Prefix
         backend:
-          serviceName: coffee-svc
-          servicePort: 80
+          service:
+            name: coffee-svc
+            port:
+              number: 80
 ```
 
 Here is a breakdown of what this Ingress resource definition means:
@@ -44,7 +50,7 @@ Here is a breakdown of what this Ingress resource definition means:
   * The rule with the path `/coffee` instructs NGINX to distribute the requests with the `/coffee` URI among the pods of the *coffee* service, which is deployed with the name `coffee‑svc` in the cluster.
   * Both rules instruct NGINX to distribute the requests to `port 80` of the corresponding service (the `servicePort` field).
 
-> For complete instructions on deploying the Ingress and Secret resources in the cluster, see the [complete-example](https://github.com/nginxinc/kubernetes-ingress/tree/v1.12.0/examples/complete-example) in our GitHub repo.
+> For complete instructions on deploying the Ingress and Secret resources in the cluster, see the [complete-example](https://github.com/nginxinc/kubernetes-ingress/tree/v2.0.0/examples/complete-example) in our GitHub repo.
 
 > To learn more about the Ingress resource, see the [Ingress resource documentation](https://kubernetes.io/docs/concepts/services-networking/ingress/) in the Kubernetes docs.
 
@@ -63,17 +69,21 @@ Starting from Kubernetes 1.18, you can use the following new features:
     - path: /tea/green
       pathType: Exact
       backend:
-        serviceName: tea-svc
-        servicePort: 80
+          service:
+            name: tea-svc
+            port:
+              number: 80
     - path: /coffee
-      pathType: ImplementationSpecific # default
+      pathType: ImplementationSpecific
       backend:
-        serviceName: coffee-svc
-        servicePort: 80
+          service:
+            name: coffee-svc
+            port:
+              number: 80
   ```
 * The `ingressClassName` field is now supported:
   ```yaml
-    apiVersion: networking.k8s.io/v1beta1
+    apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
       name: cafe-ingress
@@ -87,13 +97,13 @@ Starting from Kubernetes 1.18, you can use the following new features:
       - host: cafe.example.com
     . . .
   ```
-  When using this filed you need to create the `IngressClass` resource with the corresponding `name`. See Step 3 *Create an IngressClass resource* of the [Create Common Resources](/nginx-ingress-controller/installation/installation-with-manifests/#create-common-resources) section.
+  When using this filed you need to create the `IngressClass` resource with the corresponding `name`. See Step 3 *Create an IngressClass resource* of the [Create Common Resources](/nginx-ingress-controller/installation/installation-with-manifests/#2-create-common-resources) section.
 
 ## Restrictions
 
 The NGINX Ingress Controller imposes the following restrictions on Ingress resources:
 * When defining an Ingress resource, the `host` field is required.
-* The `host` value needs to be unique among all Ingress and VirtualServer resources unless the Ingress resource is a [mergeable minion](/nginx-ingress-controller/configuration/ingress-resources/cross-namespace-configuration/). See also [Handling Host Collisions](/nginx-ingress-controller/configuration/handling-host-collisions).
+* The `host` value needs to be unique among all Ingress and VirtualServer resources unless the Ingress resource is a [mergeable minion](/nginx-ingress-controller/configuration/ingress-resources/cross-namespace-configuration/). See also [Handling Host and Listener Collisions](/nginx-ingress-controller/configuration/handling-host-and-listener-collisions).
 
 ## Advanced Configuration
 
