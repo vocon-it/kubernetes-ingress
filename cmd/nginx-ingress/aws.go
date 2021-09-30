@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/marketplacemetering"
 	"github.com/aws/aws-sdk-go-v2/service/marketplacemetering/types"
 
-	"github.com/dgrijalva/jwt-go/v4"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 var (
@@ -70,7 +70,7 @@ func checkAWSEntitlement() error {
 		return fmt.Errorf("error parsing Public Key: %w", err)
 	}
 
-	token, err := jwt.ParseWithClaims(*out.Signature, &claims{}, jwt.KnownKeyfunc(jwt.SigningMethodPS256, pubKey))
+	token, err := jwt.ParseWithClaims(*out.Signature, &claims{}, KnownKeyfunc(jwt.SigningMethodPS256, pubKey))
 	if err != nil {
 		return fmt.Errorf("error parsing the JWT token: %w", err)
 	}
@@ -86,25 +86,41 @@ func checkAWSEntitlement() error {
 	return nil
 }
 
-type claims struct {
-	ProductCode      string    `json:"productCode,omitempty"`
-	PublicKeyVersion int32     `json:"publicKeyVersion,omitempty"`
-	IssuedAt         *jwt.Time `json:"iat,omitempty"`
-	Nonce            string    `json:"nonce,omitempty"`
+func KnownKeyfunc(signingMethod jwt.SigningMethod, key interface{}) jwt.Keyfunc {
+	return func(t *jwt.Token) (interface{}, error) {
+		if signingMethod.Alg() != t.Header["alg"] {
+			return nil, fmt.Errorf("unexpected signing method: %v, expected: %v", t.Header["alg"], signingMethod.Alg())
+		}
+		return key, nil
+	}
 }
 
-func (c claims) Valid(h *jwt.ValidationHelper) error {
+type claims struct {
+	ProductCode      string       `json:"productCode,omitempty"`
+	PublicKeyVersion int32        `json:"publicKeyVersion,omitempty"`
+	IssuedAt         *time.Time   `json:"iat,omitempty"`
+	Nonce            string       `json:"nonce,omitempty"`
+}
+
+func (c *claims) VerifyNotBefore(nbf *time.Time, now time.Time, required bool) bool {
+		if nbf == nil {
+			return !required
+		}
+		return now.After(*nbf) || now.Equal(*nbf)
+	}
+
+func (c claims) Valid() error {
 	if c.Nonce == "" {
-		return &jwt.InvalidClaimsError{Message: "the JWT token doesn't include the Nonce"}
+		return jwt.NewValidationError("the JWT token doesn't include the Nonce", jwt.ValidationErrorClaimsInvalid)
 	}
 	if c.ProductCode == "" {
-		return &jwt.InvalidClaimsError{Message: "the JWT token doesn't include the ProductCode"}
+		return jwt.NewValidationError("the JWT token doesn't include the ProductCode", jwt.ValidationErrorClaimsInvalid)
 	}
 	if c.PublicKeyVersion == 0 {
-		return &jwt.InvalidClaimsError{Message: "the JWT token doesn't include the PublicKeyVersion"}
+		return jwt.NewValidationError("the JWT token doesn't include the PublicKeyVersion", jwt.ValidationErrorClaimsInvalid)
 	}
-	if err := h.ValidateNotBefore(c.IssuedAt); err != nil {
-		return err
+	if !c.VerifyNotBefore(c.IssuedAt, time.Now(), false) {
+		return jwt.NewValidationError("the JWT token is not valid yet", jwt.ValidationErrorNotValidYet)
 	}
 
 	return nil
