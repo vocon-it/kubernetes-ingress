@@ -112,6 +112,7 @@ type LoadBalancerController struct {
 	appProtectLogConfLister       cache.Store
 	appProtectDosPolicyLister     cache.Store
 	appProtectDosLogConfLister    cache.Store
+	appProtectDosProtectedLister  cache.Store
 	globalConfigurationLister     cache.Store
 	appProtectUserSigLister       cache.Store
 	transportServerLister         cache.Store
@@ -263,6 +264,7 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		if lbc.appProtectDosEnabled {
 			lbc.addAppProtectDosPolicyHandler(createAppProtectDosPolicyHandlers(lbc))
 			lbc.addAppProtectDosLogConfHandler(createAppProtectDosLogConfHandlers(lbc))
+			lbc.addAppProtectDosProtectedResourceHandler(createAppProtectDosProtectedResourceHandlers(lbc))
 		}
 	}
 
@@ -389,6 +391,15 @@ func (lbc *LoadBalancerController) addAppProtectDosLogConfHandler(handlers cache
 	informer := lbc.dynInformerFactory.ForResource(appprotectdos.DosLogConfGVR).Informer()
 	informer.AddEventHandler(handlers)
 	lbc.appProtectDosLogConfLister = informer.GetStore()
+
+	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
+}
+
+// addAppProtectDosLogConfHandler creates dynamic informer for custom appprotectdos logging config resource
+func (lbc *LoadBalancerController) addAppProtectDosProtectedResourceHandler(handlers cache.ResourceEventHandlerFuncs) {
+	informer := lbc.dynInformerFactory.ForResource(appprotectdos.DosProtectedResourceGVR).Informer()
+	informer.AddEventHandler(handlers)
+	lbc.appProtectDosProtectedLister = informer.GetStore()
 
 	lbc.cacheSyncs = append(lbc.cacheSyncs, informer.HasSynced)
 }
@@ -775,6 +786,8 @@ func (lbc *LoadBalancerController) sync(task task) {
 		lbc.syncAppProtectDosPolicy(task)
 	case appProtectDosLogConf:
 		lbc.syncAppProtectDosLogConf(task)
+	case appProtectDosProtectedResource:
+		lbc.syncDosProtectedResource(task)
 	case ingressLink:
 		lbc.syncIngressLink(task)
 	}
@@ -3487,6 +3500,30 @@ func (lbc *LoadBalancerController) syncAppProtectDosLogConf(task task) {
 		glog.V(2).Infof("Adding or Updating AppProtectDosLogConf: %v\n", key)
 
 		changes, problems = lbc.appProtectDosConfiguration.AddOrUpdateLogConf(obj.(*unstructured.Unstructured))
+	}
+
+	lbc.processAppProtectDosChanges(changes)
+	lbc.processAppProtectDosProblems(problems)
+}
+
+func (lbc *LoadBalancerController) syncDosProtectedResource(task task) {
+	key := task.Key
+	glog.V(3).Infof("Syncing DosProtectedResource %v", key)
+	obj, confExists, err := lbc.appProtectDosLogConfLister.GetByKey(key)
+	if err != nil {
+		lbc.syncQueue.Requeue(task, err)
+		return
+	}
+
+	var changes []appprotectdos.Change
+	var problems []appprotectdos.Problem
+
+	if !confExists {
+		glog.V(2).Infof("Deleting DosProtectedResource: %v\n", key)
+		changes, problems = lbc.appProtectDosConfiguration.DeleteProtectedResource(key)
+	} else {
+		glog.V(2).Infof("Adding or Updating DosProtectedResource: %v\n", key)
+		changes, problems = lbc.appProtectDosConfiguration.AddOrUpdateProtectedResource(obj.(*unstructured.Unstructured))
 	}
 
 	lbc.processAppProtectDosChanges(changes)
