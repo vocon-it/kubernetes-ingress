@@ -1287,21 +1287,45 @@ func (cnf *Configurator) updateApResources(ingEx *IngressEx) *appProtectResource
 	return &apResources
 }
 
+func getDosProtectedValue(obj *unstructured.Unstructured, fields ...string) string {
+	val, has, err := unstructured.NestedString(obj.Object, fields...)
+	if err != nil {
+		glog.Warningf("failed to get value from DosProtectedResource: %v, %v", fields, err)
+	}
+	if !has {
+		glog.Warningf("missing value from DosProtectedResource: %v, %v", fields, err)
+	}
+	return val
+}
+
 func (cnf *Configurator) updateApDosResources(ingEx *IngressEx) *appProtectDosResources {
 	var dosResources appProtectDosResources
+	if ingEx.AppProtectDosResourceEx != nil {
+		if ingEx.AppProtectDosResourceEx.DosProtected != nil {
+			protected := ingEx.AppProtectDosResourceEx.DosProtected
+			dosResources.AppProtectDosEnable = getDosProtectedValue(protected, "enable")
+			dosResources.AppProtectDosName = getDosProtectedValue(protected, "name")
+			dosResources.AppProtectDosMonitor = getDosProtectedValue(protected, "apDosMonitor")
+			dosResources.AppProtectDosAccessLogDst = getDosProtectedValue(protected, "dosAccessLogDest")
 
-	if ingEx.AppProtectDosPolicy != nil {
-		policyFileName := appProtectDosPolicyFileNameFromUnstruct(ingEx.AppProtectDosPolicy)
-		policyContent := generateApResourceFileContent(ingEx.AppProtectDosPolicy)
-		cnf.nginxManager.CreateAppProtectResourceFile(policyFileName, policyContent)
-		dosResources.AppProtectDosPolicy = policyFileName
-	}
+			if ingEx.AppProtectDosResourceEx.DosPolicy != nil {
+				pol := ingEx.AppProtectDosResourceEx.DosLogConf
+				policyFileName := appProtectDosPolicyFileNameFromUnstruct(pol)
+				policyContent := generateApResourceFileContent(pol)
+				cnf.nginxManager.CreateAppProtectResourceFile(policyFileName, policyContent)
+				dosResources.AppProtectDosPolicyFile = policyFileName
+			}
 
-	if ingEx.AppProtectDosLogConf != nil {
-		logConfFileName := appProtectDosLogConfFileNameFromUnstruct(ingEx.AppProtectDosLogConf)
-		logConfContent := generateApResourceFileContent(ingEx.AppProtectDosLogConf)
-		cnf.nginxManager.CreateAppProtectResourceFile(logConfFileName, logConfContent)
-		dosResources.AppProtectDosLogconfs = logConfFileName + " " + generateDosLogDest(ingEx.AppProtectDosLogDst)
+			if ingEx.AppProtectDosResourceEx.DosLogConf != nil {
+				log := ingEx.AppProtectDosResourceEx.DosLogConf
+				logConfFileName := appProtectDosLogConfFileNameFromUnstruct(log)
+				logConfContent := generateApResourceFileContent(log)
+				cnf.nginxManager.CreateAppProtectResourceFile(logConfFileName, logConfContent)
+				logDest := getDosProtectedValue(protected, "dosSecurityLog", "dosLogDest")
+				dosResources.AppProtectDosLogConfFile = logConfFileName + " " + generateDosLogDest(logDest)
+			}
+		}
+
 	}
 
 	return &dosResources
@@ -1372,6 +1396,8 @@ func generateApResourceFileContent(apResource *unstructured.Unstructured) []byte
 	data, _ := json.Marshal(spec)
 	return data
 }
+
+type ResourceOperation func(resource *unstructured.Unstructured, ingExes []*IngressEx, mergeableIngresses []*MergeableIngresses, vsExes []*VirtualServerEx) (Warnings, error)
 
 // AddOrUpdateAppProtectResource updates Ingresses and VirtualServers that use App Protect or App Protect DoS resources.
 func (cnf *Configurator) AddOrUpdateAppProtectResource(resource *unstructured.Unstructured, ingExes []*IngressEx, mergeableIngresses []*MergeableIngresses, vsExes []*VirtualServerEx) (Warnings, error) {

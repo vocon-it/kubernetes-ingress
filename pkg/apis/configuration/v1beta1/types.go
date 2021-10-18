@@ -19,10 +19,10 @@ type DosProtectedResource struct {
 type DosProtectedResourceSpec struct {
 	Enable           bool            `json:"enable"`
 	Name             string          `json:"name"`
-	ApDosPolicy      string          `json:"apDosPolicy"`
-	DosSecurityLog   *DosSecurityLog `json:"dosSecurityLog"`
 	ApDosMonitor     string          `json:"apDosMonitor"`
 	DosAccessLogDest string          `json:"dosAccessLogDest"`
+	ApDosPolicy      string          `json:"apDosPolicy"`
+	DosSecurityLog   *DosSecurityLog `json:"dosSecurityLog"`
 }
 
 // DosSecurityLog defines the security log of a Dos policy.
