@@ -33,7 +33,7 @@ This document explains how to use the NGINX Plus Ingress Controller image from t
 
 3. This secret can now be added to a deployment spec, or to a service account to apply to all deployments for a given SA spec. See the official documentation [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#create-a-pod-that-uses-your-secret) and [here](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account) for more details.
 
-4. Update the deployment spec with the chosen image path. Choose the image from the available images listed [here](nginx-ingress-controller/technical-specifications/#images-with-nginx-plus).
+4. Update the deployment spec with the chosen image path. Choose the image from the available images listed [here](/nginx-ingress-controller/technical-specifications/#images-with-nginx-plus).
 
 5. You can use the certificate and key from the MyF5 portal and the Docker registry API to list the available image tags for the repositories, e.g.:
    ```
@@ -41,10 +41,10 @@ This document explains how to use the NGINX Plus Ingress Controller image from t
    {
     "name": "nginx-ic/nginx-plus-ingress",
     "tags": [
-        "1.12.0-alpine",
-        "1.12.0-ot",
-        "1.12.0-ubi",
-        "1.12.0"
+        "2.0.2-alpine",
+        "2.0.2-ot",
+        "2.0.2-ubi",
+        "2.0.2"
     ]
     }
 
@@ -52,8 +52,8 @@ This document explains how to use the NGINX Plus Ingress Controller image from t
    {
     "name": "nginx-ic-nap/nginx-plus-ingress",
     "tags": [
-        "1.12.0-ubi",
-        "1.12.0"
+        "2.0.2-ubi",
+        "2.0.2"
     ]
     }
    ```

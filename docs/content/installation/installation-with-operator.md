@@ -7,7 +7,6 @@ doctypes: [""]
 toc: true
 ---
 
-
 This document describes how to install the NGINX Ingress Controller in your Kubernetes cluster using the NGINX Ingress Operator.
 
 ## Prerequisites
@@ -33,7 +32,7 @@ spec:
   type: deployment
   image:
     repository: nginx/nginx-ingress
-    tag: 1.12.0
+    tag: 2.0.2
     pullPolicy: Always
   serviceType: NodePort
   nginxPlus: False

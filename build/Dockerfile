@@ -1,46 +1,44 @@
 # syntax=docker/dockerfile:1.3
 ARG BUILD_OS=debian
-ARG NGINX_PLUS_VERSION=r24
+ARG NGINX_PLUS_VERSION=r25
 ARG UBI_VERSION=8
-ARG FILES=
 
 ############################################# Base image for Debian #############################################
-FROM nginx:1.21.1 AS debian
+FROM nginx:1.21.3 AS debian
 
 RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y libcap2-bin \
-	# temporary fix for CVE-2021-3711
-	&& apt-get install -y openssl libssl1.1 \
+	# temporary fix for CVE-2021-37750
+	&& apt-get install -y libkrb5-3 libk5crypto3 \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& echo $NGINX_VERSION > nginx_version
 
 
 ############################################# Base image for Alpine #############################################
 # docker.io/library/nginx is a temporary workaround for Dependabot to see this as different from the one used in Debian
-FROM docker.io/library/nginx:1.21.1-alpine AS alpine
+FROM docker.io/library/nginx:1.21.3-alpine AS alpine
 
 RUN apk add --no-cache libcap \
-	# temporary fix for CVE-2021-3711
-	&& apk upgrade --no-cache libcrypto1.1 libssl1.1
+	# temporary fix for CVE-2021-22945
+	&& apk upgrade --no-cache curl libcurl
 
 
 ############################################# Base image for Alpine with NGINX Plus #############################################
-FROM alpine:3.13 as alpine-plus
+FROM alpine:3.14 as alpine-plus
 ARG NGINX_PLUS_VERSION
 
 RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/apk/cert.pem,mode=0644 \
 	--mount=type=secret,id=nginx-repo.key,dst=/etc/apk/cert.key,mode=0644 \
 	wget -nv -O /etc/apk/keys/nginx_signing.rsa.pub https://cs.nginx.com/static/keys/nginx_signing.rsa.pub \
 	&& printf "%s\n" "https://pkgs.nginx.com/plus/alpine/v$(grep -E -o '^[0-9]+\.[0-9]+' /etc/alpine-release)/main" >> /etc/apk/repositories \
-	&& apk add --no-cache libcap nginx-plus~${NGINX_PLUS_VERSION#r} nginx-plus-module-njs~${NGINX_PLUS_VERSION#r} \
-	# temporary fix for CVE-2021-3711 and CVE-2021-36159
-	&& apk upgrade --no-cache libcrypto1.1 libssl1.1 apk-tools
+	&& apk add --no-cache libcap nginx-plus~${NGINX_PLUS_VERSION#r} nginx-plus-module-njs~${NGINX_PLUS_VERSION#r}
 
 
 ############################################# Base image for Debian with NGINX Plus #############################################
 FROM debian:buster-slim AS debian-plus
 ARG IC_VERSION
 ARG NGINX_PLUS_VERSION
+ARG BUILD_OS
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode=0644 \
@@ -49,11 +47,10 @@ RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode
 	&& apt-get install --no-install-recommends --no-install-suggests -y ca-certificates gnupg curl apt-transport-https libcap2-bin \
 	&& curl -sSL https://cs.nginx.com/static/keys/nginx_signing.key | gpg --dearmor > /etc/apt/trusted.gpg.d/nginx_signing.gpg \
 	&& curl -sSL -o /etc/apt/apt.conf.d/90pkgs-nginx https://cs.nginx.com/static/files/90pkgs-nginx \
-	&& printf "%s\n" "Acquire::https::pkgs.nginx.com::User-Agent  \"k8s-ic-$IC_VERSION-apt\";" >> /etc/apt/apt.conf.d/90pkgs-nginx \
-	&& printf "%s\n" "deb https://pkgs.nginx.com/plus/debian buster nginx-plus" > /etc/apt/sources.list.d/nginx-plus.list \
+	&& printf "%s\n" "Acquire::https::pkgs.nginx.com::User-Agent \"k8s-ic-$IC_VERSION${BUILD_OS##debian-plus}-apt\";" >> /etc/apt/apt.conf.d/90pkgs-nginx \
+	&& printf "%s\n" "deb https://pkgs.nginx.com/plus/${NGINX_PLUS_VERSION^^}/debian buster nginx-plus" > /etc/apt/sources.list.d/nginx-plus.list \
 	&& apt-get update \
-	&& apt-get install --no-install-recommends --no-install-suggests -y \
-	nginx-plus-${NGINX_PLUS_VERSION} nginx-plus-module-njs-${NGINX_PLUS_VERSION} \
+	&& apt-get install --no-install-recommends --no-install-suggests -y nginx-plus nginx-plus-module-njs \
 	&& apt-get purge --auto-remove -y apt-transport-https gnupg curl \
 	&& rm -rf /var/lib/apt/lists/*
 
@@ -68,14 +65,11 @@ RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode
 	apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y gnupg curl apt-transport-https \
 	&& curl -sSL https://cs.nginx.com/static/keys/app-protect-security-updates.key | gpg --dearmor > /etc/apt/trusted.gpg.d/nginx_app_signing.gpg \
-	&& sed -i "s/$IC_VERSION/$IC_VERSION-nap/g" /etc/apt/apt.conf.d/90pkgs-nginx \
-	&& printf "%s\n" "deb https://pkgs.nginx.com/app-protect/debian buster nginx-plus" \
+	&& printf "%s\n" "deb https://pkgs.nginx.com/app-protect/${NGINX_PLUS_VERSION^^}/debian buster nginx-plus" \
 	"deb https://pkgs.nginx.com/app-protect-security-updates/debian buster nginx-plus" > /etc/apt/sources.list.d/nginx-app-protect.list \
 	&& apt-get update \
-	# searching apt-cache for the latest version of NAP package compatible with the $NGINX_PLUS_VERSION
-	&& module_version=$(apt-cache showpkg nginx-plus-module-appprotect | awk -v ver="nginx-plus-$NGINX_PLUS_VERSION" '{ if ($6 == ver) {print $1; exit}}') \
-	&& apt-get install --no-install-recommends --no-install-suggests -y nginx-plus-module-appprotect=${module_version} app-protect=${module_version} \
-	&& apt-get install --no-install-recommends --no-install-suggests -y app-protect-attack-signatures app-protect-threat-campaigns \
+	&& apt-get install --no-install-recommends --no-install-suggests -y \
+	nginx-plus-module-appprotect app-protect app-protect-attack-signatures app-protect-threat-campaigns \
 	&& apt-get purge --auto-remove -y apt-transport-https gnupg curl \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& rm /etc/apt/sources.list.d/nginx-app-protect.list
@@ -104,7 +98,7 @@ LABEL name="NGINX Ingress Controller" \
 	summary="The Ingress controller is an application that runs in a cluster and configures an HTTP load balancer according to Ingress resources." \
 	io.openshift.tags="nginx,ingress-controller,ingress,controller,kubernetes,openshift"
 
-RUN microdnf --nodocs install -y shadow-utils ca-certificates systemd systemd-libs \
+RUN microdnf --nodocs install -y shadow-utils ca-certificates \
 	&& groupadd --system --gid 101 nginx \
 	&& useradd --system --gid nginx --no-create-home --home-dir /nonexistent --comment "nginx user" --shell /bin/false --uid 101 nginx
 
@@ -143,16 +137,17 @@ ARG NGINX_PLUS_VERSION
 RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode=0644 \
 	--mount=type=secret,id=nginx-repo.key,dst=/etc/ssl/nginx/nginx-repo.key,mode=0644 \
 	--mount=type=secret,id=rhel_license,dst=/tmp/rhel_license,mode=0644 \
-	set -x \
-	&& source /tmp/rhel_license \
-	&& curl -sS https://cs.nginx.com/static/files/app-protect-7.repo > /etc/yum.repos.d/app-protect-7.repo \
+	source /tmp/rhel_license \
 	&& subscription-manager register --org=${RHEL_ORGANIZATION} --activationkey=${RHEL_ACTIVATION_KEY} || true \
-	&& subscription-manager attach --auto \
+	&& subscription-manager attach \
+	&& set -x \
+	&& curl -sS https://cs.nginx.com/static/files/app-protect-7.repo > /etc/yum.repos.d/app-protect-7.repo \
 	&& subscription-manager repos --enable rhel-7-server-optional-rpms --enable rhel-7-server-extras-rpms \
 	&& rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
 	&& yum clean all \
 	&& yum install -y nginx-plus-module-appprotect-${NGINX_PLUS_VERSION} $(repoquery app-protect-${NGINX_PLUS_VERSION#r}*) app-protect-attack-signatures app-protect-threat-campaigns \
-	&& rm /etc/yum.repos.d/app-protect-7.repo
+	&& rm /etc/yum.repos.d/app-protect-7.repo \
+	&& subscription-manager unregister
 
 # Uncomment the lines below if you want to install a custom CA certificate
 # COPY build/*.crt  /etc/pki/ca-trust/source/anchors/
@@ -160,14 +155,11 @@ RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode
 
 
 ############################################# Base image containing libs for Opentracing #############################################
-FROM opentracing/nginx-opentracing:nginx-1.21.1 as opentracing-lib
+FROM opentracing/nginx-opentracing:nginx-1.21.3 as opentracing-lib
 
 
 ############################################# Build image for Opentracing #############################################
 FROM debian as opentracing
-
-RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y libcurl3-gnutls \
-	&& rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=bind,from=opentracing-lib,target=/tmp/ cp -av /tmp/usr/local/lib/libopentracing.so* /tmp/usr/local/lib/libjaegertracing*so* /tmp/usr/local/lib/libzipkin*so* /tmp/usr/local/lib/libdd*so* /tmp/usr/local/lib/libyaml*so* /usr/local/lib/ \
 	&& cp -av /tmp/usr/lib/nginx/modules/ngx_http_opentracing_module.so /usr/lib/nginx/modules/ \
@@ -181,23 +173,27 @@ ARG NGINX_PLUS_VERSION
 RUN --mount=type=secret,id=nginx-repo.crt,dst=/etc/ssl/nginx/nginx-repo.crt,mode=0644 \
 	--mount=type=secret,id=nginx-repo.key,dst=/etc/ssl/nginx/nginx-repo.key,mode=0644 \
 	apt-get update \
-	&& apt-get install --no-install-recommends --no-install-suggests -y libcurl3-gnutls nginx-plus-module-opentracing-${NGINX_PLUS_VERSION} \
+	&& apt-get install --no-install-recommends --no-install-suggests -y nginx-plus-module-opentracing-${NGINX_PLUS_VERSION} \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=bind,from=opentracing-lib,target=/tmp/ cp -av /tmp/usr/local/lib/libjaegertracing*so* /tmp/usr/local/lib/libzipkin*so* /tmp/usr/local/lib/libdd*so* /tmp/usr/local/lib/libyaml*so* /usr/local/lib/ \
 	&& ldconfig
 
 
-############################################# Create common files for NGINX Plus #############################################
-FROM $BUILD_OS as plus-common
+############################################# Create common files, permissions and setcap #############################################
+FROM ${BUILD_OS} as common
 
-COPY --chown=nginx:0 internal/configs/oidc/* /etc/nginx/oidc/
+ARG BUILD_OS
+ARG IC_VERSION
+ARG GIT_COMMIT
+ARG DATE
+ARG TARGETPLATFORM
 
+# copy oidc files on plus build
+RUN --mount=target=/tmp [ -n "${BUILD_OS##*plus*}" ] && exit 0; mkdir -p etc/nginx/oidc/ && cp -a /tmp/internal/configs/oidc/* /etc/nginx/oidc/
 
-############################################# Create common files for NGINX Plus with App Protect #############################################
-FROM plus-common as nap-common
-
-RUN mkdir -p /etc/nginx/waf/nac-policies /etc/nginx/waf/nac-logconfs /etc/nginx/waf/nac-usersigs /var/log/app_protect /opt/app_protect \
+# run only on nap build
+RUN --mount=target=/tmp [ -n "${BUILD_OS##*nap*}" ] && exit 0; mkdir -p /etc/nginx/waf/nac-policies /etc/nginx/waf/nac-logconfs /etc/nginx/waf/nac-usersigs /var/log/app_protect /opt/app_protect \
 	&& chown -R nginx:0 /etc/app_protect /usr/share/ts /var/log/app_protect/ /opt/app_protect/ /var/log/nginx/ \
 	&& touch /etc/nginx/waf/nac-usersigs/index.conf \
 	&& printf "%s\n" "MODULE = ALL;" "LOG_LEVEL = TS_CRIT;" "FILE = 2;" > /etc/app_protect/bd/logger.cfg \
@@ -209,31 +205,16 @@ RUN mkdir -p /etc/nginx/waf/nac-policies /etc/nginx/waf/nac-logconfs /etc/nginx/
 	import_export_policy \
 	set_active \
 	; do sed -i "/\[$v/a log_level=fatal" "/etc/app_protect/tools/asm_logging.conf" \
-	; done
+	; done \
+	&& cp -a /tmp/build/log-default.json /etc/nginx
 
-COPY --chown=nginx:0 build/log-default.json /etc/nginx
-
-
-############################################# Create common files, permissions and setcap #############################################
-FROM ${FILES:-$BUILD_OS} as common
-
-ARG PLUS
-ARG BUILD_OS
-ARG IC_VERSION
-ARG GIT_COMMIT
-ARG DATE
-ARG TARGETPLATFORM
-
-RUN mkdir -p /var/lib/nginx /etc/nginx/secrets /etc/nginx/stream-conf.d \
+RUN --mount=target=/tmp mkdir -p /var/lib/nginx /etc/nginx/secrets /etc/nginx/stream-conf.d \
 	&& setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx 'cap_net_bind_service=+ep' /usr/sbin/nginx-debug \
 	&& setcap -v 'cap_net_bind_service=+ep' /usr/sbin/nginx 'cap_net_bind_service=+ep' /usr/sbin/nginx-debug \
-	&& chown -R nginx:0 /etc/nginx /etc/nginx/secrets /var/cache/nginx /var/lib/nginx \
+	&& [ -z "${BUILD_OS##*plus*}" ] && PLUS=-plus; cp -a /tmp/internal/configs/version1/nginx$PLUS.ingress.tmpl /tmp/internal/configs/version1/nginx$PLUS.tmpl \
+	/tmp/internal/configs/version2/nginx$PLUS.virtualserver.tmpl /tmp/internal/configs/version2/nginx$PLUS.transportserver.tmpl / \
+	&& chown -R nginx:0 /etc/nginx /etc/nginx/secrets /var/cache/nginx /var/lib/nginx /*.tmpl \
 	&& rm -f /etc/nginx/conf.d/* /etc/apt/apt.conf.d/90pkgs-nginx /etc/apt/sources.list.d/nginx-plus.list
-
-COPY --chown=nginx:0 internal/configs/version1/nginx$PLUS.ingress.tmpl \
-	internal/configs/version1/nginx$PLUS.tmpl \
-	internal/configs/version2/nginx$PLUS.virtualserver.tmpl \
-	internal/configs/version2/nginx$PLUS.transportserver.tmpl /
 
 # Uncomment the line below if you would like to add the default.pem to the image
 # and use it as a certificate and key for the default server
