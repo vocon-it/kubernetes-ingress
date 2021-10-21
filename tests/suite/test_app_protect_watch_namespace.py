@@ -103,7 +103,6 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint, test_namespac
 
     def fin():
         print("Clean up:")
-        time.sleep(400)
         src_ing_yaml = f"{TEST_DATA}/appprotect/appprotect-ingress.yaml"
         delete_items_from_yaml(kube_apis, src_ing_yaml, test_namespace)
         delete_ap_policy(kube_apis.custom_objects, pol_name, policy_namespace)
@@ -117,45 +116,45 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint, test_namespac
 
     return BackendSetup(req_url, req_url_2, metrics_url, ingress_host)
 
-# @pytest.mark.skip_for_nginx_oss
-# @pytest.mark.appprotectwatch
-# @pytest.mark.smoke
-# @pytest.mark.parametrize(
-#     "crd_ingress_controller_with_ap",
-#     [
-#        {
-#             "extra_args": [
-#                 f"-enable-custom-resources",
-#                 f"-enable-app-protect",
-#                 f"-enable-prometheus-metrics"
-#             ]
-#         }
-#     ],
-#     indirect=True,
-# )
-# class TestAppProtectWatchNamespaceDisabled:
-#     def test_responses(
-#         self, request, kube_apis, crd_ingress_controller_with_ap, backend_setup, test_namespace
-#     ):
-#         """
-#         Test dataguard-alarm AppProtect policy: Block malicious script in url
-#         """
-#         print("------------- Run test for AP policy: dataguard-alarm --------------")
-#         print(f"Request URL: {backend_setup.req_url} and Host: {backend_setup.ingress_host}")
+@pytest.mark.skip_for_nginx_oss
+@pytest.mark.appprotectwatch
+@pytest.mark.smoke
+@pytest.mark.parametrize(
+    "crd_ingress_controller_with_ap",
+    [
+       {
+            "extra_args": [
+                f"-enable-custom-resources",
+                f"-enable-app-protect",
+                f"-enable-prometheus-metrics"
+            ]
+        }
+    ],
+    indirect=True,
+)
+class TestAppProtectWatchNamespaceDisabled:
+    def test_responses(
+        self, request, kube_apis, crd_ingress_controller_with_ap, backend_setup, test_namespace
+    ):
+        """
+        Test dataguard-alarm AppProtect policy: Block malicious script in url
+        """
+        print("------------- Run test for AP policy: dataguard-alarm --------------")
+        print(f"Request URL: {backend_setup.req_url} and Host: {backend_setup.ingress_host}")
 
-#         ensure_response_from_backend(
-#             backend_setup.req_url, backend_setup.ingress_host, check404=True
-#         )
+        ensure_response_from_backend(
+            backend_setup.req_url, backend_setup.ingress_host, check404=True
+        )
 
-#         print("----------------------- Send request ----------------------")
-#         resp = requests.get(
-#             f"{backend_setup.req_url}/<script>", headers={"host": backend_setup.ingress_host}, verify=False
-#         )
+        print("----------------------- Send request ----------------------")
+        resp = requests.get(
+            f"{backend_setup.req_url}/<script>", headers={"host": backend_setup.ingress_host}, verify=False
+        )
         
-#         print(resp.text)
+        print(resp.text)
 
-#         assert valid_resp_body in resp.text
-#         assert resp.status_code == 200
+        assert valid_resp_body in resp.text
+        assert resp.status_code == 200
 
 @pytest.mark.skip_for_nginx_oss
 @pytest.mark.appprotectwatch
