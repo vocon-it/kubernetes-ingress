@@ -30,8 +30,9 @@ from suite.resources_utils import (
 )
 from suite.yaml_utils import get_first_ingress_host_from_yaml
 
-
-policy_namespace = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+timestamp = round(time.time() * 1000)
+test_namespace = f"test-namespace-{str(timestamp)}"
+policy_namespace = f"policy-test-namespace-{str(timestamp)}"
 valid_resp_body = "Server name:"
 invalid_resp_body = "The requested URL was rejected. Please consult with your administrator."
 reload_times = {}
@@ -54,7 +55,7 @@ class BackendSetup:
 
 
 @pytest.fixture(scope="class")
-def backend_setup(request, kube_apis, ingress_controller_endpoint, test_namespace) -> BackendSetup:
+def backend_setup(request, kube_apis, ingress_controller_endpoint) -> BackendSetup:
     """
     Deploy a simple application and AppProtect manifests.
 
@@ -65,7 +66,10 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint, test_namespac
     :return: BackendSetup
     """
     policy = "dataguard-alarm-transparent"
+    
+    create_namespace_with_name_from_yaml(kube_apis.v1, test_namespace, f"{TEST_DATA}/common/ns.yaml")
     print("------------------------- Deploy backend application -------------------------")
+    
     create_example_app(kube_apis, "simple", test_namespace)
     req_url = f"https://{ingress_controller_endpoint.public_ip}:{ingress_controller_endpoint.port_ssl}/backend1"
     req_url_2 = f"https://{ingress_controller_endpoint.public_ip}:{ingress_controller_endpoint.port_ssl}/backend2"
@@ -111,6 +115,7 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint, test_namespac
         delete_common_app(kube_apis, "simple", test_namespace)
         src_sec_yaml = f"{TEST_DATA}/appprotect/appprotect-secret.yaml"
         delete_items_from_yaml(kube_apis, src_sec_yaml, test_namespace)
+        delete_namespace(kube_apis.v1, test_namespace)
 
     request.addfinalizer(fin)
 
@@ -134,7 +139,7 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint, test_namespac
 )
 class TestAppProtectWatchNamespaceDisabled:
     def test_responses(
-        self, request, kube_apis, crd_ingress_controller_with_ap, backend_setup, test_namespace
+        self, request, kube_apis, crd_ingress_controller_with_ap, backend_setup
     ):
         """
         Test dataguard-alarm AppProtect policy: Block malicious script in url
@@ -167,7 +172,7 @@ class TestAppProtectWatchNamespaceDisabled:
                 f"-enable-custom-resources",
                 f"-enable-app-protect",
                 f"-enable-prometheus-metrics",
-                f"-watch-namespace=$(POD_NAMESPACE)"
+                f"-watch-namespace={test_namespace}"
             ]
         }
     ],
