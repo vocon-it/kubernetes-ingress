@@ -30,6 +30,8 @@ from suite.resources_utils import (
 )
 from suite.yaml_utils import get_first_ingress_host_from_yaml
 
+# This test shows that a policy outside of the namespace test_namespace is not picked up by IC.
+
 timestamp = round(time.time() * 1000)
 test_namespace = f"test-namespace-{str(timestamp)}"
 policy_namespace = f"policy-test-namespace-{str(timestamp)}"
@@ -65,7 +67,7 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint) -> BackendSet
     :param test_namespace:
     :return: BackendSetup
     """
-    policy = "dataguard-alarm-transparent"
+    policy = "file-block"
     
     create_namespace_with_name_from_yaml(kube_apis.v1, test_namespace, f"{TEST_DATA}/common/ns.yaml")
     print("------------------------- Deploy backend application -------------------------")
@@ -121,6 +123,9 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint) -> BackendSet
 
     return BackendSetup(req_url, req_url_2, metrics_url, ingress_host)
 
+# the first case does not set "-watch-namespace" so the policy is configured on the ingress. 
+# This causes the traffic to be blocked
+
 @pytest.mark.skip_for_nginx_oss
 @pytest.mark.appprotectwatch
 @pytest.mark.smoke
@@ -153,13 +158,16 @@ class TestAppProtectWatchNamespaceDisabled:
 
         print("----------------------- Send request ----------------------")
         resp = requests.get(
-            f"{backend_setup.req_url}/<script>", headers={"host": backend_setup.ingress_host}, verify=False
+            f"{backend_setup.req_url}/test.bat", headers={"host": backend_setup.ingress_host}, verify=False
         )
         
         print(resp.text)
 
-        assert valid_resp_body in resp.text
+        assert invalid_resp_body in resp.text
         assert resp.status_code == 200
+
+# In this test case the "-watch-namespace" param is set so the policy in policy_namespace 
+# Is not configured on the ingress -> NAP uses the default policy which will not block the same request.
 
 @pytest.mark.skip_for_nginx_oss
 @pytest.mark.appprotectwatch
@@ -194,10 +202,10 @@ class TestAppProtectWatchNamespaceEnabled:
 
         print("----------------------- Send request ----------------------")
         resp = requests.get(
-            f"{backend_setup.req_url}/<script>", headers={"host": backend_setup.ingress_host}, verify=False
+            f"{backend_setup.req_url}/test.bat", headers={"host": backend_setup.ingress_host}, verify=False
         )
         
         print(resp.text)
 
-        assert invalid_resp_body in resp.text
+        assert valid_resp_body in resp.text
         assert resp.status_code == 200
