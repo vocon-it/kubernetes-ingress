@@ -1,7 +1,5 @@
 import requests
-import random
-import string
-import pytest, json
+import pytest
 import time
 
 from settings import TEST_DATA, DEPLOYMENTS
@@ -24,9 +22,6 @@ from suite.resources_utils import (
     create_namespace_with_name_from_yaml,
     ensure_response_from_backend,
     wait_before_test,
-    get_last_reload_time,
-    get_test_file_name,
-    write_to_json,
 )
 from suite.yaml_utils import get_first_ingress_host_from_yaml
 
@@ -127,8 +122,7 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint) -> BackendSet
 # This causes the traffic to be blocked
 
 @pytest.mark.skip_for_nginx_oss
-@pytest.mark.appprotectwatch
-@pytest.mark.smoke
+@pytest.mark.appprotect
 @pytest.mark.parametrize(
     "crd_ingress_controller_with_ap",
     [
@@ -137,6 +131,7 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint) -> BackendSet
                 f"-enable-custom-resources",
                 f"-enable-app-protect",
                 f"-enable-prometheus-metrics"
+                f"-watch-namespace=False"
             ]
         }
     ],
@@ -147,9 +142,9 @@ class TestAppProtectWatchNamespaceDisabled:
         self, request, kube_apis, crd_ingress_controller_with_ap, backend_setup
     ):
         """
-        Test dataguard-alarm AppProtect policy: Block malicious script in url
+        Test file_block AppProtect policy without -watch-namespace
         """
-        print("------------- Run test for AP policy: dataguard-alarm --------------")
+        print("------------- Run test for AP policy: file-block --------------")
         print(f"Request URL: {backend_setup.req_url} and Host: {backend_setup.ingress_host}")
 
         ensure_response_from_backend(
@@ -170,8 +165,7 @@ class TestAppProtectWatchNamespaceDisabled:
 # Is not configured on the ingress -> NAP uses the default policy which will not block the same request.
 
 @pytest.mark.skip_for_nginx_oss
-@pytest.mark.appprotectwatch
-@pytest.mark.smoke
+@pytest.mark.appprotect
 @pytest.mark.parametrize(
     "crd_ingress_controller_with_ap",
     [
@@ -191,9 +185,9 @@ class TestAppProtectWatchNamespaceEnabled:
         self, request, kube_apis, crd_ingress_controller_with_ap, backend_setup, test_namespace
     ):
         """
-        Test dataguard-alarm AppProtect policy: Block malicious script in url
+        Test file-block AppProtect policy with -watch-namespace
         """
-        print("------------- Run test for AP policy: dataguard-alarm --------------")
+        print("------------- Run test for AP policy: file-block --------------")
         print(f"Request URL: {backend_setup.req_url} and Host: {backend_setup.ingress_host}")
 
         ensure_response_from_backend(
