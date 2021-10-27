@@ -131,7 +131,6 @@ def backend_setup(request, kube_apis, ingress_controller_endpoint) -> BackendSet
                 f"-enable-custom-resources",
                 f"-enable-app-protect",
                 f"-enable-prometheus-metrics"
-                f"-watch-namespace=False"
             ]
         }
     ],
