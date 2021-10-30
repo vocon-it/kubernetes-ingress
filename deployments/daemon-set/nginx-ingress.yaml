@@ -55,6 +55,7 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         args:
+          - -enable-snippets
           - -nginx-configmaps=$(POD_NAMESPACE)/nginx-config
           - -default-server-tls-secret=$(POD_NAMESPACE)/default-server-secret
          #- -v=3 # Enables extensive logging. Useful for troubleshooting.
